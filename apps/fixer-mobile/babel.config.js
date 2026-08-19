@@ -1,15 +1,17 @@
 module.exports = function (api) {
   api.cache(true);
   return {
-    presets: [
+    presets: ['babel-preset-expo'],
+    plugins: [
+      '@babel/plugin-transform-flow-strip-types',
       [
-        'babel-preset-expo',
+        '@babel/plugin-transform-typescript',
         {
-          jsxRuntime: 'automatic',
+          allowNamespaces: true,
+          isTSX: true,
+          allExtensions: true,
         },
       ],
-    ],
-    plugins: [
       'react-native-reanimated/plugin',
     ],
   };
