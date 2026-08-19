@@ -1,0 +1,30 @@
+{
+  "name": "@fixme/validation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared validation schemas and utilities for Fix Me monorepo",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "class-validator": "^0.14.1",
+    "class-transformer": "^0.5.1"
+  },
+  "devDependencies": {
+    "@fixme/tsconfig": "*",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.5.4"
+  },
+  "license": "UNLICENSED"
+}

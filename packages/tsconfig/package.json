@@ -1,0 +1,13 @@
+{
+  "name": "@fixme/tsconfig",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared TypeScript configurations for Fix Me monorepo",
+  "files": [
+    "base.json",
+    "nestjs.json",
+    "nextjs.json",
+    "react-native.json"
+  ],
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,136 @@
+name: CI — Pull Request
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Format check
+        run: npm run format:check
+
+  test-api:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_USER: fixme_test
+          POSTGRES_PASSWORD: fixme_test_password
+          POSTGRES_DB: fixme_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: fixme_test
+      DB_PASSWORD: fixme_test_password
+      DB_DATABASE: fixme_test_db
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: ci_test_access_secret_min_64_chars_abcdefghijklmnopqrstuvwxyz123456
+      JWT_REFRESH_SECRET: ci_test_refresh_secret_min_64_chars_abcdefghijklmnopqrstuvwxyz12345
+      S3_ENDPOINT: http://localhost:9000
+      S3_ACCESS_KEY: test_key
+      S3_SECRET_KEY: test_secret
+      S3_BUCKET_CUSTOMER_MEDIA: test-bucket
+      S3_BUCKET_FIXER_DOCUMENTS: test-bucket
+      S3_BUCKET_REPAIR_MEDIA: test-bucket
+      S3_BUCKET_MESSAGE_ATTACHMENTS: test-bucket
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: |
+          npm run build --workspace=packages/shared-types
+          npm run build --workspace=packages/validation
+
+      - name: Run unit tests
+        run: npm run test --workspace=apps/api -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./apps/api/coverage/lcov.info
+          flags: api-unit
+
+  build:
+    name: Build All Apps
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all
+        run: npm run build
+        env:
+          SKIP_ENV_VALIDATION: true
+
+      - name: Check build artifacts exist
+        run: |
+          test -f apps/api/dist/main.js || (echo "API build missing!" && exit 1)
+          echo "Build artifacts verified"

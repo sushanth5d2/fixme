@@ -1,0 +1,15 @@
+{
+  "extends": "@fixme/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": "./",
+    "paths": {
+      "@fixme/shared-types": ["../../packages/shared-types/dist/index.d.ts"],
+      "@fixme/validation": ["../../packages/validation/dist/index.d.ts"]
+    }
+  },
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist"]
+}
+

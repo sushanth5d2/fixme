@@ -1,0 +1,48 @@
+{
+  "name": "@fixme/customer-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fix Me — React Native Customer App",
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "dev": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "clean": "rimraf .expo"
+  },
+  "dependencies": {
+    "@fixme/shared-types": "*",
+    "@fixme/validation": "*",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.10.1",
+    "@react-navigation/bottom-tabs": "^6.6.1",
+    "expo": "~51.0.28",
+    "expo-camera": "~15.0.16",
+    "expo-document-picker": "~12.0.2",
+    "expo-image-picker": "~15.0.7",
+    "expo-location": "~17.0.1",
+    "expo-notifications": "~0.28.15",
+    "expo-secure-store": "~13.0.2",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-screens": "3.31.1",
+    "zustand": "^4.5.5",
+    "@tanstack/react-query": "^5.56.2",
+    "axios": "^1.7.5",
+    "socket.io-client": "^4.7.5",
+    "react-native-reanimated": "~3.10.1",
+    "react-native-gesture-handler": "~2.17.1"
+  },
+  "devDependencies": {
+    "@fixme/tsconfig": "*",
+    "@babel/core": "^7.25.2",
+    "@types/react": "~18.2.79",
+    "typescript": "^5.5.4"
+  },
+  "license": "UNLICENSED"
+}

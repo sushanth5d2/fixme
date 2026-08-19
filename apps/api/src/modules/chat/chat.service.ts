@@ -1,0 +1,174 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { ConversationEntity } from './conversation.entity';
+import { ConversationMemberEntity } from './conversation-member.entity';
+import { MessageEntity } from './message.entity';
+import { JobEntity } from '../jobs/job.entity';
+import { SendMessageDto, CreateConversationDto } from './dto/chat.dto';
+
+@Injectable()
+export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
+  constructor(
+    @InjectRepository(ConversationEntity)
+    private readonly conversationRepo: Repository<ConversationEntity>,
+
+    @InjectRepository(ConversationMemberEntity)
+    private readonly memberRepo: Repository<ConversationMemberEntity>,
+
+    @InjectRepository(MessageEntity)
+    private readonly messageRepo: Repository<MessageEntity>,
+
+    @InjectRepository(JobEntity)
+    private readonly jobRepo: Repository<JobEntity>,
+
+    private readonly dataSource: DataSource,
+  ) {}
+
+  public async createConversation(
+    userId: string,
+    dto: CreateConversationDto,
+  ): Promise<ConversationEntity> {
+    const job = await this.jobRepo.findOne({
+      where: { id: dto.jobId },
+      relations: ['fixer', 'customer'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+
+    const isParticipant =
+      job.fixer.userId === userId || job.customer.userId === userId;
+    if (!isParticipant) {
+      throw new ForbiddenException('You are not a participant of this job');
+    }
+
+    // Check if conversation already exists for this job
+    const existing = await this.conversationRepo.findOne({
+      where: { jobId: dto.jobId },
+    });
+    if (existing) return existing;
+
+    return this.dataSource.transaction(async (manager) => {
+      const conversation = manager.create(ConversationEntity, {
+        jobId: dto.jobId,
+        requestId: job.requestId,
+        isActive: true,
+      });
+      const saved = await manager.save(conversation);
+
+      // Add both participants
+      const customerMember = manager.create(ConversationMemberEntity, {
+        conversationId: saved.id,
+        userId: job.customer.userId,
+      });
+      const fixerMember = manager.create(ConversationMemberEntity, {
+        conversationId: saved.id,
+        userId: job.fixer.userId,
+      });
+      await manager.save([customerMember, fixerMember]);
+
+      // Send initial message if provided
+      if (dto.initialMessage) {
+        const msg = manager.create(MessageEntity, {
+          conversationId: saved.id,
+          senderId: userId,
+          content: dto.initialMessage,
+        });
+        await manager.save(msg);
+        saved.lastMessageAt = msg.createdAt;
+        await manager.save(saved);
+      }
+
+      this.logger.log(`Conversation created: ${saved.id} for job: ${dto.jobId}`);
+      return saved;
+    });
+  }
+
+  public async sendMessage(
+    userId: string,
+    dto: SendMessageDto,
+  ): Promise<MessageEntity> {
+    const member = await this.memberRepo.findOne({
+      where: { conversationId: dto.conversationId, userId },
+    });
+    if (!member) {
+      throw new ForbiddenException('You are not a member of this conversation');
+    }
+
+    const conversation = await this.conversationRepo.findOne({
+      where: { id: dto.conversationId },
+    });
+    if (!conversation || !conversation.isActive) {
+      throw new ForbiddenException('This conversation is no longer active');
+    }
+
+    const message = this.messageRepo.create({
+      conversationId: dto.conversationId,
+      senderId: userId,
+      content: dto.content,
+    });
+    const saved = await this.messageRepo.save(message);
+
+    // Update last message timestamp
+    await this.conversationRepo.update(dto.conversationId, {
+      lastMessageAt: new Date(),
+    });
+
+    return saved;
+  }
+
+  public async getMessages(
+    userId: string,
+    conversationId: string,
+    page = 1,
+    limit = 50,
+  ): Promise<{ data: MessageEntity[]; total: number }> {
+    const member = await this.memberRepo.findOne({
+      where: { conversationId, userId },
+    });
+    if (!member) {
+      throw new ForbiddenException('You are not a member of this conversation');
+    }
+
+    const [data, total] = await this.messageRepo.findAndCount({
+      where: { conversationId },
+      relations: ['sender', 'attachments'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    // Mark as read
+    await this.memberRepo.update(member.id, { lastReadAt: new Date() });
+
+    return { data, total };
+  }
+
+  public async getMyConversations(
+    userId: string,
+  ): Promise<ConversationEntity[]> {
+    const members = await this.memberRepo.find({
+      where: { userId },
+      relations: ['conversation', 'conversation.members', 'conversation.members.user'],
+    });
+    return members.map((m) => m.conversation);
+  }
+
+  public async markAsRead(
+    userId: string,
+    conversationId: string,
+  ): Promise<{ message: string }> {
+    const member = await this.memberRepo.findOne({
+      where: { conversationId, userId },
+    });
+    if (!member) throw new ForbiddenException('Not a member');
+    await this.memberRepo.update(member.id, { lastReadAt: new Date() });
+    return { message: 'Marked as read' };
+  }
+}

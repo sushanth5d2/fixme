@@ -1,0 +1,34 @@
+{
+  "name": "fixme",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fix Me — Repair Service Marketplace Monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "turbo run format",
+    "format:check": "turbo run format:check",
+    "clean": "turbo run clean && rimraf node_modules",
+    "db:migrate": "npm run db:migrate --workspace=apps/api",
+    "db:migrate:revert": "npm run db:migrate:revert --workspace=apps/api",
+    "db:seed": "npm run db:seed --workspace=apps/api",
+    "db:seed:dev": "npm run db:seed:dev --workspace=apps/api",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "rimraf": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@11.11.0"
+}
