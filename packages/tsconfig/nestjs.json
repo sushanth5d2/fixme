@@ -9,9 +9,7 @@
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "incremental": true,
     "removeComments": true
   },
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }
-
