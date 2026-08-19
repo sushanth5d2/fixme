@@ -1,0 +1,134 @@
+Here is the complete **step-by-step execution flow** to start and run the entire **Fix Me** platform from scratch.
+
+---
+
+```mermaid
+graph TD
+    A["1. Prerequisites (Docker, Node.js)"] --> B["2. Install Dependencies & Build Packages"]
+    B --> C["3. Start Docker Infrastructure (PostgreSQL, Redis, MinIO)"]
+    C --> D["4. Run Database Migrations & Seeds"]
+    D --> E1["Launch API Server (:3000)"]
+    D --> E2["Launch Admin Dashboard (:3001)"]
+    D --> E3["Launch Customer App (Expo)"]
+    D --> E4["Launch Fixer App (Expo)"]
+```
+
+---
+
+### Step 1: Prerequisites
+Make sure you have:
+1. **Node.js**: v20.x or higher (`node -v`)
+2. **Docker Desktop**: Running in the background (`docker ps`)
+3. **Expo Go app**: Installed on your phone (or an Android Emulator / iOS Simulator)
+
+---
+
+### Step 2: Install Dependencies & Build Packages
+
+Run these commands from the root directory (`d:\FixMe`):
+
+```bash
+# 1. Install all dependencies across the monorepo
+npm install
+
+# 2. Build the shared packages (shared-types, validation)
+npm run build
+```
+
+---
+
+### Step 3: Start Infrastructure Services (Docker)
+
+Start PostgreSQL (with PostGIS), Redis, and MinIO S3 object storage:
+
+```bash
+docker compose up postgres redis minio minio-setup -d
+```
+
+Verify that all containers are healthy:
+```bash
+docker compose ps
+```
+
+---
+
+### Step 4: Run Database Migrations & Seed Data
+
+Ensure [`apps/api/.env`](file:///d:/FixMe/apps/api/.env) is configured, then run:
+
+```bash
+# Run database migrations (creates all tables, enums, and indexes)
+npm run db:migrate
+
+# (Optional) Seed initial dev data (categories, brands, mock users)
+npm run db:seed:dev --workspace=apps/api
+```
+
+---
+
+### Step 5: Start the Applications
+
+Open separate terminals for each app:
+
+#### 🖥️ Terminal 1: Backend API (NestJS)
+```bash
+npm run dev --workspace=apps/api
+```
+- **API URL**: `http://localhost:3000/api/v1`
+- **Swagger Documentation**: `http://localhost:3000/api/docs`
+- **Health Check**: `http://localhost:3000/health/live`
+
+---
+
+#### 🌐 Terminal 2: Admin Dashboard (Next.js)
+```bash
+npm run dev --workspace=apps/admin-web
+```
+- **Admin Dashboard**: `http://localhost:3001`
+- **Features**: Fixer verification, repair request monitoring, complaint resolution, category & brand management.
+
+---
+
+#### 📱 Terminal 3: Customer Mobile App (Expo)
+```bash
+npm run dev --workspace=apps/customer-mobile
+```
+- Press `a` for Android Emulator, `i` for iOS Simulator, or scan the QR code using the **Expo Go** app on your phone.
+- **Features**: Browse categories, create repair requests with location, accept quotes, live chat, rate fixers.
+
+---
+
+#### 🔧 Terminal 4: Fixer Mobile App (Expo)
+```bash
+npm run dev --workspace=apps/fixer-mobile
+```
+- **Features**: Business registration, open repair request feed, submit repair quotes, manage job status lifecycle.
+
+---
+
+### Complete End-to-End Testing Flow
+
+Once all services are running, test the complete business flow:
+
+| Step | Actor | Action |
+|---|---|---|
+| **1** | **Fixer** | Open Fixer App → Sign up → Submit Business Registration (GSTIN, experience, location). |
+| **2** | **Admin** | Open Admin Web (`:3001/fixers`) → Review Fixer profile → Click **Approve**. |
+| **3** | **Customer** | Open Customer App → Sign up → Select **Phone** or **Laptop** → Describe issue & submit **Repair Request**. |
+| **4** | **Fixer** | Open Fixer App → Go to **Feed** → See Customer's request → Tap **Send Quote** (e.g. `₹1,500`). |
+| **5** | **Customer** | Open Customer App → Go to **My Requests** → View submitted quotes → Tap **Accept Quote**. |
+| **6** | **Job Lifecycle** | Fixer marks status transitions: `Assigned` ➔ `On the Way` ➔ `Diagnosing` ➔ `Repairing` ➔ `Completed`. |
+| **7** | **Chat** | Open in-app chat between Customer and Fixer to exchange updates. |
+| **8** | **Review** | Customer submits a 5-star review and rating upon job completion. |
+
+---
+
+### Quick Reference & Ports
+
+| Service | Port | Local URL |
+|---|---|---|
+| **Backend REST API** | `3000` | [http://localhost:3000/api/docs](http://localhost:3000/api/docs) |
+| **Admin Web App** | `3001` | [http://localhost:3001](http://localhost:3001) |
+| **MinIO S3 Storage Console** | `9001` | [http://localhost:9001](http://localhost:9001) *(User: `fixme_minio_key`, Pass: `fixme_minio_secret`)* |
+| **PostgreSQL Database** | `5432` | `localhost:5432` *(DB: `fixme_db`, User: `fixme`)* |
+| **Redis Cache** | `6379` | `localhost:6379` |
