@@ -15,4 +15,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
+// 3. Prevent duplicate/nested copies of react-native inside node_modules/expo
+config.resolver.disableHierarchicalLookup = true;
+
 module.exports = config;
