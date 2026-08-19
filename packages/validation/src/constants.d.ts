@@ -1,0 +1,25 @@
+export declare const PASSWORD_MIN_LENGTH = 8;
+export declare const PASSWORD_MAX_LENGTH = 128;
+export declare const OTP_LENGTH = 6;
+export declare const OTP_EXPIRY_MINUTES = 10;
+export declare const OTP_MAX_ATTEMPTS = 3;
+export declare const LOGIN_MAX_ATTEMPTS = 5;
+export declare const LOGIN_RATE_WINDOW_MINUTES = 15;
+export declare const ACCESS_TOKEN_EXPIRY = "15m";
+export declare const REFRESH_TOKEN_EXPIRY = "7d";
+export declare const MAX_REPAIR_PHOTOS = 10;
+export declare const MAX_REPAIR_VIDEOS = 3;
+export declare const MAX_PHOTO_SIZE_BYTES: number;
+export declare const MAX_VIDEO_SIZE_BYTES: number;
+export declare const MAX_PROFILE_PHOTO_SIZE_BYTES: number;
+export declare const MAX_DOCUMENT_SIZE_BYTES: number;
+export declare const MAX_CHAT_ATTACHMENT_SIZE_BYTES: number;
+export declare const ALLOWED_PHOTO_MIME_TYPES: string[];
+export declare const ALLOWED_VIDEO_MIME_TYPES: string[];
+export declare const ALLOWED_DOCUMENT_MIME_TYPES: string[];
+export declare const ALLOWED_CHAT_ATTACHMENT_MIME_TYPES: string[];
+export declare const DEFAULT_PAGE_SIZE = 20;
+export declare const MAX_PAGE_SIZE = 100;
+export declare const QUOTE_SIGNED_URL_EXPIRY_SECONDS = 900;
+export declare const BCRYPT_ROUNDS = 12;
+//# sourceMappingURL=constants.d.ts.map
