@@ -92,7 +92,13 @@ npm run dev --workspace=apps/admin-web
 #### 📱 Terminal 3: Customer Mobile App (Expo)
 ```bash
 npm run dev --workspace=apps/customer-mobile
+for clearing cache
+npm run dev --workspace=apps/customer-mobile -- -c
+
+in GitHub codespace
+npm run dev --workspace=apps/customer-mobile -- --tunnel
 ```
+
 - Press `a` for Android Emulator, `i` for iOS Simulator, or scan the QR code using the **Expo Go** app on your phone.
 - **Features**: Browse categories, create repair requests with location, accept quotes, live chat, rate fixers.
 
@@ -101,6 +107,12 @@ npm run dev --workspace=apps/customer-mobile
 #### 🔧 Terminal 4: Fixer Mobile App (Expo)
 ```bash
 npm run dev --workspace=apps/fixer-mobile
+for clearing the cache 
+npm run dev --workspace=apps/fixer-mobile -- -c
+
+in GitHub codespace 
+npm run dev --workspace=apps/fixer-mobile -- --tunnel
+
 ```
 - **Features**: Business registration, open repair request feed, submit repair quotes, manage job status lifecycle.
 

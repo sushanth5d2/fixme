@@ -55,7 +55,9 @@ async function bootstrap(): Promise<void> {
 
   // ── API Versioning ─────────────────────────────────────────
   app.enableVersioning({ type: VersioningType.URI });
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: ['/', 'health/(.*)'],
+  });
 
   // ── Global Pipes ───────────────────────────────────────────
   app.useGlobalPipes(
