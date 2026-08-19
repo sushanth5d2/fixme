@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Fix Me — React Native Customer App",
-  "main": "expo/AppEntry.js",
+  "main": "index.js",
   "scripts": {
     "dev": "expo start",
     "android": "expo run:android",
