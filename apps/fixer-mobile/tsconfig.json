@@ -1,15 +1,12 @@
 {
   "extends": "@fixme/tsconfig/react-native.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@fixme/shared-types": ["../../packages/shared-types/src/index"],
       "@fixme/validation": ["../../packages/validation/src/index"]
-    },
-    "jsx": "react-jsx"
+    }
   },
   "include": ["src/**/*", "App.tsx", "app.d.ts"],
   "exclude": ["node_modules", "dist"]

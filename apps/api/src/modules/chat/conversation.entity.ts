@@ -15,13 +15,13 @@ export class ConversationEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'request_id', nullable: true })
+  @Column({ name: 'request_id', type: 'uuid', nullable: true })
   requestId!: string | null;
 
-  @Column({ name: 'job_id', nullable: true })
+  @Column({ name: 'job_id', type: 'uuid', nullable: true })
   jobId!: string | null;
 
-  @Column({ name: 'is_active', default: true })
+  @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
 
   @Column({ name: 'last_message_at', type: 'timestamptz', nullable: true })

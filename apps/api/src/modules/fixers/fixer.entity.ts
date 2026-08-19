@@ -25,29 +25,29 @@ export class FixerEntity {
   @JoinColumn({ name: 'user_id' })
   user!: UserEntity;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
-  @Column({ name: 'owner_name', length: 200 })
+  @Column({ name: 'owner_name', type: 'varchar', length: 200 })
   ownerName!: string;
 
   @Index()
-  @Column({ name: 'company_name', length: 200 })
+  @Column({ name: 'company_name', type: 'varchar', length: 200 })
   companyName!: string;
 
-  @Column({ length: 15, nullable: true, unique: true })
+  @Column({ type: 'varchar', length: 15, nullable: true, unique: true })
   gstin!: string | null;
 
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
-  @Column({ name: 'profile_photo_key', length: 512, nullable: true })
+  @Column({ name: 'profile_photo_key', type: 'varchar', length: 512, nullable: true })
   profilePhotoKey!: string | null;
 
   @Column({ name: 'experience_years', type: 'smallint', default: 0 })
   experienceYears!: number;
 
-  @Column({ name: 'emergency_service', default: false })
+  @Column({ name: 'emergency_service', type: 'boolean', default: false })
   emergencyService!: boolean;
 
   @Column({ name: 'working_hours_start', type: 'time', nullable: true })
@@ -74,28 +74,28 @@ export class FixerEntity {
   @Column({ name: 'average_rating', type: 'decimal', precision: 3, scale: 2, default: 0 })
   averageRating!: number;
 
-  @Column({ name: 'total_reviews', default: 0 })
+  @Column({ name: 'total_reviews', type: 'int', default: 0 })
   totalReviews!: number;
 
-  @Column({ name: 'completed_jobs', default: 0 })
+  @Column({ name: 'completed_jobs', type: 'int', default: 0 })
   completedJobs!: number;
 
   @Column({ name: 'response_rate', type: 'decimal', precision: 5, scale: 2, default: 0 })
   responseRate!: number;
 
   // Business address
-  @Column({ name: 'address_line', length: 500 })
+  @Column({ name: 'address_line', type: 'varchar', length: 500 })
   addressLine!: string;
 
   @Index()
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   city!: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   state!: string;
 
   @Index()
-  @Column({ length: 6 })
+  @Column({ type: 'varchar', length: 6 })
   pincode!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })

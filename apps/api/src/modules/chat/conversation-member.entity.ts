@@ -22,7 +22,7 @@ export class ConversationMemberEntity {
   conversation!: ConversationEntity;
 
   @Index()
-  @Column({ name: 'conversation_id' })
+  @Column({ name: 'conversation_id', type: 'uuid' })
   conversationId!: string;
 
   @ManyToOne(() => UserEntity)
@@ -30,7 +30,7 @@ export class ConversationMemberEntity {
   user!: UserEntity;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
   @Column({ name: 'last_read_at', type: 'timestamptz', nullable: true })

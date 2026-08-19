@@ -22,13 +22,13 @@ export class FixerDocumentEntity {
   fixer!: FixerEntity;
 
   @Index()
-  @Column({ name: 'fixer_id' })
+  @Column({ name: 'fixer_id', type: 'uuid' })
   fixerId!: string;
 
   @Column({ type: 'enum', enum: DocumentType })
   type!: DocumentType;
 
-  @Column({ name: 'storage_key', length: 512 })
+  @Column({ name: 'storage_key', type: 'varchar', length: 512 })
   storageKey!: string;
 
   @Index()
@@ -46,7 +46,7 @@ export class FixerDocumentEntity {
   @JoinColumn({ name: 'reviewed_by_id' })
   reviewedBy!: UserEntity | null;
 
-  @Column({ name: 'reviewed_by_id', nullable: true })
+  @Column({ name: 'reviewed_by_id', type: 'uuid', nullable: true })
   reviewedById!: string | null;
 
   @Column({ name: 'reviewed_at', type: 'timestamptz', nullable: true })

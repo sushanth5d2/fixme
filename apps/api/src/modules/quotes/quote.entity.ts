@@ -22,7 +22,7 @@ export class QuoteEntity {
   request!: RepairRequestEntity;
 
   @Index()
-  @Column({ name: 'request_id' })
+  @Column({ name: 'request_id', type: 'uuid' })
   requestId!: string;
 
   @ManyToOne(() => FixerEntity, { onDelete: 'CASCADE' })
@@ -30,7 +30,7 @@ export class QuoteEntity {
   fixer!: FixerEntity;
 
   @Index()
-  @Column({ name: 'fixer_id' })
+  @Column({ name: 'fixer_id', type: 'uuid' })
   fixerId!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })

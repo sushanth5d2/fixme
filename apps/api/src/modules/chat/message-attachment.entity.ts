@@ -18,19 +18,19 @@ export class MessageAttachmentEntity {
   @JoinColumn({ name: 'message_id' })
   message!: MessageEntity;
 
-  @Column({ name: 'message_id' })
+  @Column({ name: 'message_id', type: 'uuid' })
   messageId!: string;
 
   @Column({ type: 'enum', enum: MediaType })
   type!: MediaType;
 
-  @Column({ name: 'storage_key', length: 512 })
+  @Column({ name: 'storage_key', type: 'varchar', length: 512 })
   storageKey!: string;
 
-  @Column({ name: 'original_name', length: 255 })
+  @Column({ name: 'original_name', type: 'varchar', length: 255 })
   originalName!: string;
 
-  @Column({ name: 'mime_type', length: 100 })
+  @Column({ name: 'mime_type', type: 'varchar', length: 100 })
   mimeType!: string;
 
   @Column({ name: 'size_bytes', type: 'bigint' })

@@ -24,7 +24,7 @@ export class FixerServiceEntity {
   fixer!: FixerEntity;
 
   @Index()
-  @Column({ name: 'fixer_id' })
+  @Column({ name: 'fixer_id', type: 'uuid' })
   fixerId!: string;
 
   @ManyToOne(() => DeviceCategoryEntity)
@@ -32,7 +32,7 @@ export class FixerServiceEntity {
   category!: DeviceCategoryEntity;
 
   @Index()
-  @Column({ name: 'category_id' })
+  @Column({ name: 'category_id', type: 'uuid' })
   categoryId!: string;
 
   @ManyToOne(() => DeviceBrandEntity, { nullable: true })
@@ -40,7 +40,7 @@ export class FixerServiceEntity {
   brand!: DeviceBrandEntity | null;
 
   @Index()
-  @Column({ name: 'brand_id', nullable: true })
+  @Column({ name: 'brand_id', type: 'uuid', nullable: true })
   brandId!: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

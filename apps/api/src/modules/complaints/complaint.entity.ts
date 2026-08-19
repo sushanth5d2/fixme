@@ -22,7 +22,7 @@ export class ComplaintEntity {
   job!: JobEntity;
 
   @Index()
-  @Column({ name: 'job_id' })
+  @Column({ name: 'job_id', type: 'uuid' })
   jobId!: string;
 
   @ManyToOne(() => UserEntity)
@@ -30,14 +30,14 @@ export class ComplaintEntity {
   complainant!: UserEntity;
 
   @Index()
-  @Column({ name: 'complainant_id' })
+  @Column({ name: 'complainant_id', type: 'uuid' })
   complainantId!: string;
 
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'respondent_id' })
   respondent!: UserEntity;
 
-  @Column({ name: 'respondent_id' })
+  @Column({ name: 'respondent_id', type: 'uuid' })
   respondentId!: string;
 
   @Column({ type: 'enum', enum: ComplaintReason })
@@ -64,7 +64,7 @@ export class ComplaintEntity {
   @JoinColumn({ name: 'resolved_by_id' })
   resolvedBy!: UserEntity | null;
 
-  @Column({ name: 'resolved_by_id', nullable: true })
+  @Column({ name: 'resolved_by_id', type: 'uuid', nullable: true })
   resolvedById!: string | null;
 
   @Column({ name: 'resolved_at', type: 'timestamptz', nullable: true })

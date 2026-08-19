@@ -20,13 +20,14 @@ export class OtpEntity {
   @JoinColumn({ name: 'user_id' })
   user!: UserEntity;
 
-  @Column({ name: 'user_id' })
+  @Index()
+  @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
-  @Column({ length: 15 })
+  @Column({ type: 'varchar', length: 15 })
   mobile!: string;
 
-  @Column({ name: 'otp_hash', length: 255 })
+  @Column({ name: 'otp_hash', type: 'varchar', length: 255 })
   otpHash!: string;
 
   @Column({ name: 'expires_at', type: 'timestamptz' })
@@ -35,7 +36,7 @@ export class OtpEntity {
   @Column({ type: 'smallint', default: 0 })
   attempts!: number;
 
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: false })
   verified!: boolean;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

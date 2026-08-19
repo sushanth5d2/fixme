@@ -19,20 +19,21 @@ export class RefreshTokenEntity {
   @JoinColumn({ name: 'user_id' })
   user!: UserEntity;
 
-  @Column({ name: 'user_id' })
+  @Index()
+  @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
-  @Column({ name: 'token_hash', length: 255 })
+  @Column({ name: 'token_hash', type: 'varchar', length: 255 })
   tokenHash!: string;
 
   @Index({ unique: true })
-  @Column({ length: 36 })
+  @Column({ type: 'varchar', length: 36 })
   jti!: string;
 
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt!: Date;
 
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: false })
   revoked!: boolean;
 
   @Column({ type: 'inet', nullable: true })

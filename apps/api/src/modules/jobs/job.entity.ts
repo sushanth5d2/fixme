@@ -26,14 +26,14 @@ export class JobEntity {
   request!: RepairRequestEntity;
 
   @Index()
-  @Column({ name: 'request_id' })
+  @Column({ name: 'request_id', type: 'uuid' })
   requestId!: string;
 
   @ManyToOne(() => QuoteEntity)
   @JoinColumn({ name: 'quote_id' })
   quote!: QuoteEntity;
 
-  @Column({ name: 'quote_id' })
+  @Column({ name: 'quote_id', type: 'uuid' })
   quoteId!: string;
 
   @ManyToOne(() => FixerEntity)
@@ -41,7 +41,7 @@ export class JobEntity {
   fixer!: FixerEntity;
 
   @Index()
-  @Column({ name: 'fixer_id' })
+  @Column({ name: 'fixer_id', type: 'uuid' })
   fixerId!: string;
 
   @ManyToOne(() => CustomerEntity)
@@ -49,7 +49,7 @@ export class JobEntity {
   customer!: CustomerEntity;
 
   @Index()
-  @Column({ name: 'customer_id' })
+  @Column({ name: 'customer_id', type: 'uuid' })
   customerId!: string;
 
   @Column({
@@ -63,7 +63,7 @@ export class JobEntity {
   @Column({ name: 'scheduled_date', type: 'date', nullable: true })
   scheduledDate!: string | null;
 
-  @Column({ name: 'scheduled_time_slot', length: 50, nullable: true })
+  @Column({ name: 'scheduled_time_slot', type: 'varchar', length: 50, nullable: true })
   scheduledTimeSlot!: string | null;
 
   @Column({ name: 'started_at', type: 'timestamptz', nullable: true })

@@ -15,14 +15,14 @@ export class UserEntity {
   id!: string;
 
   @Index({ unique: true })
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   email!: string;
 
   @Index({ unique: true })
-  @Column({ length: 15 })
+  @Column({ type: 'varchar', length: 15 })
   mobile!: string;
 
-  @Column({ name: 'password_hash', length: 255 })
+  @Column({ name: 'password_hash', type: 'varchar', length: 255 })
   passwordHash!: string;
 
   @Index()
@@ -37,10 +37,10 @@ export class UserEntity {
   })
   status!: UserStatus;
 
-  @Column({ name: 'is_email_verified', default: false })
+  @Column({ name: 'is_email_verified', type: 'boolean', default: false })
   isEmailVerified!: boolean;
 
-  @Column({ name: 'is_mobile_verified', default: false })
+  @Column({ name: 'is_mobile_verified', type: 'boolean', default: false })
   isMobileVerified!: boolean;
 
   @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })

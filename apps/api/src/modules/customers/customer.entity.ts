@@ -20,16 +20,16 @@ export class CustomerEntity {
   @JoinColumn({ name: 'user_id' })
   user!: UserEntity;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
-  @Column({ name: 'first_name', length: 100 })
+  @Column({ name: 'first_name', type: 'varchar', length: 100 })
   firstName!: string;
 
-  @Column({ name: 'last_name', length: 100 })
+  @Column({ name: 'last_name', type: 'varchar', length: 100 })
   lastName!: string;
 
-  @Column({ name: 'profile_photo_key', length: 512, nullable: true })
+  @Column({ name: 'profile_photo_key', type: 'varchar', length: 512, nullable: true })
   profilePhotoKey!: string | null;
 
   @OneToMany(() => AddressEntity, (addr) => addr.customer)

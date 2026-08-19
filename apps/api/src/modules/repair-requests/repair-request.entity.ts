@@ -27,7 +27,7 @@ export class RepairRequestEntity {
   customer!: CustomerEntity;
 
   @Index()
-  @Column({ name: 'customer_id' })
+  @Column({ name: 'customer_id', type: 'uuid' })
   customerId!: string;
 
   @ManyToOne(() => DeviceCategoryEntity)
@@ -35,17 +35,17 @@ export class RepairRequestEntity {
   category!: DeviceCategoryEntity;
 
   @Index()
-  @Column({ name: 'category_id' })
+  @Column({ name: 'category_id', type: 'uuid' })
   categoryId!: string;
 
   @ManyToOne(() => DeviceBrandEntity, { nullable: true })
   @JoinColumn({ name: 'brand_id' })
   brand!: DeviceBrandEntity | null;
 
-  @Column({ name: 'brand_id', nullable: true })
+  @Column({ name: 'brand_id', type: 'uuid', nullable: true })
   brandId!: string | null;
 
-  @Column({ name: 'device_model', length: 200, nullable: true })
+  @Column({ name: 'device_model', type: 'varchar', length: 200, nullable: true })
   deviceModel!: string | null;
 
   @Column({ type: 'text' })
@@ -62,12 +62,11 @@ export class RepairRequestEntity {
   @Column({ type: 'enum', enum: UrgencyLevel, default: UrgencyLevel.MEDIUM })
   priority!: UrgencyLevel;
 
-  // Snapshot of address at time of request (prevents issues if address is later deleted)
   @ManyToOne(() => AddressEntity, { nullable: true })
   @JoinColumn({ name: 'address_id' })
   address!: AddressEntity | null;
 
-  @Column({ name: 'address_id', nullable: true })
+  @Column({ name: 'address_id', type: 'uuid', nullable: true })
   addressId!: string | null;
 
   @Column({ name: 'address_snapshot', type: 'jsonb', nullable: true })
@@ -82,7 +81,7 @@ export class RepairRequestEntity {
   @Column({ name: 'preferred_date', type: 'date', nullable: true })
   preferredDate!: string | null;
 
-  @Column({ name: 'preferred_time_slot', length: 50, nullable: true })
+  @Column({ name: 'preferred_time_slot', type: 'varchar', length: 50, nullable: true })
   preferredTimeSlot!: string | null;
 
   @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })

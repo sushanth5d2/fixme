@@ -20,7 +20,7 @@ export class JobStatusHistoryEntity {
   job!: JobEntity;
 
   @Index()
-  @Column({ name: 'job_id' })
+  @Column({ name: 'job_id', type: 'uuid' })
   jobId!: string;
 
   @Column({ name: 'from_status', type: 'enum', enum: JobStatus, nullable: true })
@@ -29,7 +29,7 @@ export class JobStatusHistoryEntity {
   @Column({ name: 'to_status', type: 'enum', enum: JobStatus })
   toStatus!: JobStatus;
 
-  @Column({ name: 'changed_by_user_id', nullable: true })
+  @Column({ name: 'changed_by_user_id', type: 'uuid', nullable: true })
   changedByUserId!: string | null;
 
   @Column({ type: 'text', nullable: true })

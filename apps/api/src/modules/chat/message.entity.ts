@@ -22,20 +22,20 @@ export class MessageEntity {
   conversation!: ConversationEntity;
 
   @Index()
-  @Column({ name: 'conversation_id' })
+  @Column({ name: 'conversation_id', type: 'uuid' })
   conversationId!: string;
 
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'sender_id' })
   sender!: UserEntity;
 
-  @Column({ name: 'sender_id' })
+  @Column({ name: 'sender_id', type: 'uuid' })
   senderId!: string;
 
   @Column({ type: 'text' })
   content!: string;
 
-  @Column({ name: 'is_system_message', default: false })
+  @Column({ name: 'is_system_message', type: 'boolean', default: false })
   isSystemMessage!: boolean;
 
   @OneToMany(() => MessageAttachmentEntity, (a) => a.message)

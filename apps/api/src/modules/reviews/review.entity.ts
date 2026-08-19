@@ -23,7 +23,7 @@ export class ReviewEntity {
   job!: JobEntity;
 
   @Index({ unique: true })
-  @Column({ name: 'job_id' })
+  @Column({ name: 'job_id', type: 'uuid' })
   jobId!: string;
 
   @ManyToOne(() => CustomerEntity)
@@ -31,7 +31,7 @@ export class ReviewEntity {
   customer!: CustomerEntity;
 
   @Index()
-  @Column({ name: 'customer_id' })
+  @Column({ name: 'customer_id', type: 'uuid' })
   customerId!: string;
 
   @ManyToOne(() => FixerEntity)
@@ -39,7 +39,7 @@ export class ReviewEntity {
   fixer!: FixerEntity;
 
   @Index()
-  @Column({ name: 'fixer_id' })
+  @Column({ name: 'fixer_id', type: 'uuid' })
   fixerId!: string;
 
   @Column({ type: 'smallint' })

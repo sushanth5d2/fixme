@@ -21,32 +21,32 @@ export class AddressEntity {
   @JoinColumn({ name: 'customer_id' })
   customer!: CustomerEntity;
 
-  @Column({ name: 'customer_id' })
+  @Column({ name: 'customer_id', type: 'uuid' })
   customerId!: string;
 
   @Column({ type: 'enum', enum: AddressType, default: AddressType.HOME })
   type!: AddressType;
 
-  @Column({ name: 'house_building', length: 255 })
+  @Column({ name: 'house_building', type: 'varchar', length: 255 })
   houseBuilding!: string;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   street!: string;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   area!: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   landmark!: string | null;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   city!: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   state!: string;
 
   @Index()
-  @Column({ length: 6 })
+  @Column({ type: 'varchar', length: 6 })
   pincode!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
@@ -55,7 +55,7 @@ export class AddressEntity {
   @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
   longitude!: number | null;
 
-  @Column({ name: 'is_default', default: false })
+  @Column({ name: 'is_default', type: 'boolean', default: false })
   isDefault!: boolean;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

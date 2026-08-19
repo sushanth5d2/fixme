@@ -20,13 +20,13 @@ export class NotificationEntity {
   user!: UserEntity;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
   @Column({ type: 'enum', enum: NotificationType })
   type!: NotificationType;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   title!: string;
 
   @Column({ type: 'text' })
@@ -35,7 +35,7 @@ export class NotificationEntity {
   @Column({ type: 'jsonb', nullable: true })
   data!: Record<string, unknown> | null;
 
-  @Column({ name: 'is_read', default: false })
+  @Column({ name: 'is_read', type: 'boolean', default: false })
   @Index()
   isRead!: boolean;
 

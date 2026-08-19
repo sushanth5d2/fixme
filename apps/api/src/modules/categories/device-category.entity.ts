@@ -12,18 +12,18 @@ export class DeviceCategoryEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   name!: string;
 
   @Index({ unique: true })
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   slug!: string;
 
-  @Column({ name: 'icon_key', length: 512, nullable: true })
+  @Column({ name: 'icon_key', type: 'varchar', length: 512, nullable: true })
   iconKey!: string | null;
 
   @Index()
-  @Column({ name: 'is_active', default: true })
+  @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
 
   @Column({ name: 'sort_order', type: 'smallint', default: 0 })

@@ -21,21 +21,21 @@ export class FixerServiceAreaEntity {
   fixer!: FixerEntity;
 
   @Index()
-  @Column({ name: 'fixer_id' })
+  @Column({ name: 'fixer_id', type: 'uuid' })
   fixerId!: string;
 
   @Column({ type: 'enum', enum: ServiceAreaType })
   type!: ServiceAreaType;
 
   @Index()
-  @Column({ length: 6, nullable: true })
+  @Column({ type: 'varchar', length: 6, nullable: true })
   pincode!: string | null;
 
   @Index()
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   city!: string | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   state!: string | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })

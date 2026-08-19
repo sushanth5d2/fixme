@@ -4,9 +4,9 @@
   "private": true,
   "description": "Fix Me — NestJS REST API",
   "scripts": {
-    "build": "nest build",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "nest start --watch",
-    "start": "node dist/main",
+    "start": "node dist/main.js",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
