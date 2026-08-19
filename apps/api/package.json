@@ -17,9 +17,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "db:migrate": "typeorm migration:run -d dist/database/data-source.js",
-    "db:migrate:revert": "typeorm migration:revert -d dist/database/data-source.js",
-    "db:migrate:generate": "typeorm migration:generate -d src/database/data-source.ts",
+    "db:migrate": "npm run build && typeorm migration:run -d dist/database/data-source.js",
+    "db:migrate:dev": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
+    "db:migrate:revert": "npm run build && typeorm migration:revert -d dist/database/data-source.js",
+    "db:migrate:generate": "npm run build && typeorm migration:generate -d dist/database/data-source.js",
     "db:migrate:create": "typeorm migration:create",
     "db:seed:dev": "ts-node src/database/seeds/run-seeds.ts",
     "clean": "rimraf dist"
