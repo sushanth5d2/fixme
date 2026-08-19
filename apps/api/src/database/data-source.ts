@@ -4,6 +4,8 @@ import * as dotenv from 'dotenv';
 import { join } from 'path';
 
 // Load env for CLI usage (outside NestJS DI)
+dotenv.config({ path: join(process.cwd(), 'apps/api/.env') });
+dotenv.config({ path: join(process.cwd(), '.env') });
 dotenv.config({ path: join(__dirname, '../../.env') });
 
 const configService = new ConfigService();
