@@ -1,9 +1,15 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = __DEV__
-  ? 'http://10.0.2.2:3000/api/v1' // Android emulator
-  : 'https://api.fixme.dev/api/v1';
+/**
+ * API URL is injected by app.config.js at bundle time.
+ * In Codespaces: reads CODESPACE_NAME env-var → https://<name>-3000.app.github.dev/api/v1
+ * Locally:       falls back to emulator address → http://10.0.2.2:3000/api/v1
+ */
+const API_BASE_URL: string =
+  (Constants.expoConfig?.extra as any)?.apiUrl ??
+  'http://10.0.2.2:3000/api/v1';
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN: 'fixme_access_token',
