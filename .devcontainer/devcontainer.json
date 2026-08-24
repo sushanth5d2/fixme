@@ -1,0 +1,33 @@
+{
+  "name": "Fix Me Monorepo",
+  "portsAttributes": {
+    "3000": {
+      "label": "NestJS API",
+      "visibility": "public"
+    },
+    "3001": {
+      "label": "Admin Web",
+      "visibility": "public"
+    },
+    "8081": {
+      "label": "Expo Metro Bundler",
+      "visibility": "public"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "visibility": "private"
+    },
+    "6379": {
+      "label": "Redis",
+      "visibility": "private"
+    },
+    "9000": {
+      "label": "MinIO API",
+      "visibility": "private"
+    },
+    "9001": {
+      "label": "MinIO Console",
+      "visibility": "public"
+    }
+  }
+}
