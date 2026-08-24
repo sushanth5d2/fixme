@@ -42,22 +42,39 @@ interface MyRequest {
   createdAt: string;
 }
 
+const FALLBACK_CATEGORIES: Category[] = [
+  { id: 'phone', name: 'Mobile / Smartphone', slug: 'phone' },
+  { id: 'laptop', name: 'Laptop / PC', slug: 'laptop' },
+  { id: 'tv', name: 'Television (TV)', slug: 'tv' },
+  { id: 'ac', name: 'Air Conditioner (AC)', slug: 'ac' },
+  { id: 'washing-machine', name: 'Washing Machine', slug: 'washing-machine' },
+  { id: 'refrigerator', name: 'Refrigerator', slug: 'refrigerator' },
+  { id: 'microwave', name: 'Microwave & Oven', slug: 'microwave' },
+  { id: 'printer', name: 'Printer & Scanner', slug: 'printer' },
+];
+
 export function HomeScreen({ navigation }: Props) {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
   const [recentRequests, setRecentRequests] = useState<MyRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
     try {
       const [catRes, reqRes] = await Promise.all([
-        api.get('/categories'),
-        api.get('/repair-requests/mine?limit=3'),
+        api.get('/categories').catch(() => null),
+        api.get('/repair-requests/mine?limit=3').catch(() => null),
       ]);
-      setCategories(catRes.data.data || catRes.data);
-      setRecentRequests(reqRes.data.data || []);
+      if (catRes?.data?.data?.length) {
+        setCategories(catRes.data.data);
+      } else if (Array.isArray(catRes?.data) && catRes.data.length) {
+        setCategories(catRes.data);
+      }
+      if (reqRes?.data?.data) {
+        setRecentRequests(reqRes.data.data);
+      }
     } catch {
-      // Silently handle — user will see empty state
+      // Retain fallback categories
     } finally {
       setLoading(false);
       setRefreshing(false);

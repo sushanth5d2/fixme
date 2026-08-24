@@ -11,8 +11,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UrgencyLevel } from '@fixme/shared-types';
 
 export class CreateRepairRequestDto {
-  @ApiProperty({ description: 'Device category UUID' })
-  @IsUUID()
+  @ApiProperty({ description: 'Device category UUID or slug (e.g. phone, laptop, tv)' })
+  @IsString()
   categoryId!: string;
 
   @ApiPropertyOptional({ description: 'Device brand UUID' })
@@ -52,6 +52,46 @@ export class CreateRepairRequestDto {
   @IsString()
   @MaxLength(50)
   preferredTimeSlot?: string;
+
+  @ApiPropertyOptional({ example: '9876543210', description: 'Contact phone number' })
+  @IsOptional()
+  @IsString()
+  contactNumber?: string;
+
+  @ApiPropertyOptional({ example: 'Flat 402, Sunshine Apts' })
+  @IsOptional()
+  @IsString()
+  houseBuilding?: string;
+
+  @ApiPropertyOptional({ example: 'MG Road' })
+  @IsOptional()
+  @IsString()
+  street?: string;
+
+  @ApiPropertyOptional({ example: 'Indiranagar' })
+  @IsOptional()
+  @IsString()
+  area?: string;
+
+  @ApiPropertyOptional({ example: 'Near Metro Station' })
+  @IsOptional()
+  @IsString()
+  landmark?: string;
+
+  @ApiPropertyOptional({ example: 'Bengaluru' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({ example: '560038' })
+  @IsOptional()
+  @IsString()
+  pincode?: string;
+
+  @ApiPropertyOptional({ example: 'Karnataka' })
+  @IsOptional()
+  @IsString()
+  state?: string;
 }
 
 export class CancelRepairRequestDto {

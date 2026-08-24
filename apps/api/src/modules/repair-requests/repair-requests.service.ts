@@ -66,10 +66,20 @@ export class RepairRequestsService {
     const customer = await this.customerRepo.findOne({ where: { userId } });
     if (!customer) throw new NotFoundException('Customer profile not found');
 
-    const category = await this.categoryRepo.findOne({
-      where: { id: dto.categoryId, isActive: true },
+    let category = await this.categoryRepo.findOne({
+      where: [{ id: dto.categoryId }, { slug: dto.categoryId }],
     });
-    if (!category) throw new NotFoundException('Device category not found');
+
+    if (!category) {
+      // Auto-create category if missing
+      category = await this.categoryRepo.save(
+        this.categoryRepo.create({
+          name: dto.categoryId.charAt(0).toUpperCase() + dto.categoryId.slice(1),
+          slug: dto.categoryId.toLowerCase(),
+          isActive: true,
+        }),
+      );
+    }
 
     if (dto.brandId) {
       const brand = await this.brandRepo.findOne({ where: { id: dto.brandId, isActive: true } });
@@ -77,24 +87,58 @@ export class RepairRequestsService {
     }
 
     let addressSnapshot: Record<string, unknown> | null = null;
+    let finalAddressId = dto.addressId ?? null;
+
     if (dto.addressId) {
       const address = await this.addressRepo.findOne({
         where: { id: dto.addressId, customerId: customer.id },
       });
-      if (!address) throw new NotFoundException('Address not found');
-
-      // Snapshot the address at creation time
+      if (address) {
+        addressSnapshot = {
+          houseBuilding: address.houseBuilding,
+          street: address.street,
+          area: address.area,
+          landmark: address.landmark,
+          city: address.city,
+          state: address.state,
+          pincode: address.pincode,
+          contactNumber: dto.contactNumber || customer.user?.mobile,
+          latitude: address.latitude,
+          longitude: address.longitude,
+        };
+      }
+    } else if (dto.houseBuilding || dto.street || dto.pincode || dto.city) {
+      // Inline address provided
       addressSnapshot = {
-        houseBuilding: address.houseBuilding,
-        street: address.street,
-        area: address.area,
-        landmark: address.landmark,
-        city: address.city,
-        state: address.state,
-        pincode: address.pincode,
-        latitude: address.latitude,
-        longitude: address.longitude,
+        houseBuilding: dto.houseBuilding || '',
+        street: dto.street || '',
+        area: dto.area || '',
+        landmark: dto.landmark || '',
+        city: dto.city || '',
+        state: dto.state || '',
+        pincode: dto.pincode || '',
+        contactNumber: dto.contactNumber || customer.user?.mobile,
       };
+
+      // Also persist as a customer address so customer can reuse it
+      try {
+        const savedAddr = await this.addressRepo.save(
+          this.addressRepo.create({
+            customerId: customer.id,
+            houseBuilding: dto.houseBuilding || 'Address',
+            street: dto.street || '',
+            area: dto.area || '',
+            landmark: dto.landmark || '',
+            city: dto.city || 'City',
+            state: dto.state || 'State',
+            pincode: dto.pincode || '000000',
+            isDefault: true,
+          }),
+        );
+        finalAddressId = savedAddr.id;
+      } catch (addrErr) {
+        this.logger.warn(`Could not save inline address to customer: ${addrErr}`);
+      }
     }
 
     const request = this.requestRepo.create({
@@ -104,7 +148,7 @@ export class RepairRequestsService {
       deviceModel: dto.deviceModel ?? null,
       description: dto.description,
       priority: dto.priority,
-      addressId: dto.addressId ?? null,
+      addressId: finalAddressId,
       addressSnapshot,
       latitude: (addressSnapshot?.latitude as number) ?? null,
       longitude: (addressSnapshot?.longitude as number) ?? null,
