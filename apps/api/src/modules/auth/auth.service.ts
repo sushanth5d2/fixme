@@ -58,19 +58,72 @@ export class AuthService {
     dto: SignupDto,
     ipAddress?: string,
   ): Promise<{ message: string }> {
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+
     // Check for existing email/mobile
     const existing = await this.userRepo.findOne({
       where: [{ email: dto.email }, { mobile: dto.mobile }],
     });
-    if (existing) {
-      if (existing.email === dto.email) {
-        throw new ConflictException('Email address is already registered');
-      }
-      throw new ConflictException('Mobile number is already registered');
-    }
 
-    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+
+    if (existing) {
+      if (!isDev) {
+        if (existing.email === dto.email) {
+          throw new ConflictException('Email address is already registered');
+        }
+        throw new ConflictException('Mobile number is already registered');
+      }
+
+      // In DEV mode: update existing user's password, activate, and refresh profile so testing is seamless!
+      this.logger.log(`[DEV Signup] Re-using / updating existing user for test: ${dto.email} / ${dto.mobile}`);
+      await this.dataSource.transaction(async (manager) => {
+        await manager.update(UserEntity, existing.id, {
+          email: dto.email,
+          mobile: dto.mobile,
+          passwordHash,
+          role: dto.role,
+          status: UserStatus.ACTIVE,
+          isEmailVerified: true,
+          isMobileVerified: true,
+        });
+
+        if (dto.role === UserRole.CUSTOMER) {
+          const cust = await manager.findOne(CustomerEntity, { where: { userId: existing.id } });
+          if (cust) {
+            await manager.update(CustomerEntity, cust.id, {
+              firstName: dto.firstName || cust.firstName || 'Customer',
+              lastName: dto.lastName || cust.lastName || '',
+            });
+          } else {
+            await manager.save(manager.create(CustomerEntity, {
+              userId: existing.id,
+              firstName: dto.firstName || 'Customer',
+              lastName: dto.lastName || '',
+            }));
+          }
+        } else if (dto.role === UserRole.FIXER) {
+          const fix = await manager.findOne(FixerEntity, { where: { userId: existing.id } });
+          if (fix) {
+            await manager.update(FixerEntity, fix.id, {
+              ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : fix.ownerName,
+            });
+          } else {
+            await manager.save(manager.create(FixerEntity, {
+              userId: existing.id,
+              ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : 'Fixer',
+              companyName: dto.firstName ? `${dto.firstName}'s Repairs` : 'Repair Service',
+            }));
+          }
+        }
+
+        await this.generateAndSendOtp(existing.id, dto.mobile, manager);
+      });
+
+      return {
+        message: 'Account updated for dev testing. Use OTP 123456 to verify.',
+      };
+    }
 
     let createdUser!: UserEntity;
 
@@ -247,13 +300,32 @@ export class AuthService {
       }
     }
 
-    if (!targetUserId) {
-      throw new BadRequestException('User not found for mobile number.');
-    }
-
     // In development mode OR with bypass OTP codes: skip ALL OTP validation
     if (isDev || isBypassOtp) {
       this.logger.log(`[OTP Verify] BYPASSING OTP validation (isDev=${isDev}, isBypass=${isBypassOtp})`);
+
+      if (!targetUserId) {
+        // In dev mode, auto-create a user on the fly if one wasn't found for this mobile!
+        this.logger.log(`[OTP Verify DEV] User not found for mobile ${dto.mobile}, auto-creating test user`);
+        const passwordHash = await bcrypt.hash('Password123!', BCRYPT_ROUNDS);
+        const testUser = await this.userRepo.save(this.userRepo.create({
+          email: `user_${dto.mobile}@fixme.dev`,
+          mobile: dto.mobile,
+          passwordHash,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          isEmailVerified: true,
+          isMobileVerified: true,
+        }));
+        await this.dataSource.getRepository(CustomerEntity).save(
+          this.dataSource.getRepository(CustomerEntity).create({
+            userId: testUser.id,
+            firstName: 'Customer',
+            lastName: '',
+          }),
+        );
+        targetUserId = testUser.id;
+      }
 
       // Activate user directly
       await this.userRepo.update(targetUserId, {
@@ -279,6 +351,10 @@ export class AuthService {
         tokens,
         user: user ? { id: user.id, email: user.email, role: user.role, status: user.status } : undefined,
       };
+    }
+
+    if (!targetUserId) {
+      throw new BadRequestException('User not found for mobile number.');
     }
 
     // ── Production OTP validation ────────────────────────────

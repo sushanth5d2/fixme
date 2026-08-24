@@ -63,10 +63,12 @@ export function SignupScreen({ navigation }: Props) {
         data: err?.response?.data,
         code: err?.code,
       }, null, 2));
-      Alert.alert(
-        'Signup Failed',
-        err?.response?.data?.message || err?.message || 'Something went wrong',
-      );
+      const errorMsg =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Something went wrong';
+      Alert.alert('Signup Failed', errorMsg);
     } finally {
       setLoading(false);
     }

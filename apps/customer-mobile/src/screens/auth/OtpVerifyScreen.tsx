@@ -61,7 +61,17 @@ export function OtpVerifyScreen({ route }: Props) {
       await verifyOtp(phone, otpCode);
       Alert.alert('Success', 'Your account has been verified!');
     } catch (err: any) {
-      Alert.alert('Invalid OTP', err?.response?.data?.message || 'Please try again');
+      console.error('[OTP Verify Error]', JSON.stringify({
+        message: err?.message,
+        status: err?.response?.status,
+        data: err?.response?.data,
+      }, null, 2));
+      const errorMsg =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Please try again';
+      Alert.alert('Verification Failed', errorMsg);
       setOtp(Array(OTP_LENGTH).fill(''));
       inputRefs.current[0]?.focus();
     } finally {
