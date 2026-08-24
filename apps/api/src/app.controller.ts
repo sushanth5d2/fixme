@@ -16,4 +16,10 @@ export class AppController {
       baseEndpoint: '/api/v1',
     };
   }
+
+  @Get('api')
+  @ApiOperation({ summary: 'API Root status and links' })
+  getApiRoot() {
+    return this.getRoot();
+  }
 }

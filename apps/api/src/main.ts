@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe, VersioningType, RequestMethod } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -71,7 +71,12 @@ async function bootstrap(): Promise<void> {
   // ── API Versioning ─────────────────────────────────────────
   app.enableVersioning({ type: VersioningType.URI });
   app.setGlobalPrefix('api', {
-    exclude: ['/', 'health/(.*)'],
+    exclude: [
+      { path: '', method: RequestMethod.GET },
+      { path: '/', method: RequestMethod.GET },
+      { path: 'api', method: RequestMethod.GET },
+      'health/(.*)',
+    ],
   });
 
   // ── Global Pipes ───────────────────────────────────────────
