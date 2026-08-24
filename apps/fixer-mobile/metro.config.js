@@ -15,30 +15,23 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
-// 3. Block the duplicate react-native inside expo/node_modules to prevent
-//    Metro from ever resolving or transforming it. This eliminates the
-//    "} as ReactNativePublicAPI" syntax error permanently.
+// 3. Block nested node_modules in expo to prevent duplicate React / React Native runtimes
 const exclusionList = require('metro-config/src/defaults/exclusionList');
 config.resolver.blockList = exclusionList([
-  // Block expo's nested react-native (v0.87.0) — we use the project's v0.74.5
   new RegExp(
-    path.resolve(monorepoRoot, 'node_modules/expo/node_modules/react-native')
+    path.resolve(monorepoRoot, 'node_modules/expo/node_modules')
       .replace(/[/\\]/g, '[/\\\\]') + '[/\\\\].*'
   ),
 ]);
 
-// 4. Pin critical packages so Metro always resolves them from the project
+// 4. Pin single instance of React, React Native, and key libraries
 config.resolver.extraNodeModules = {
-  'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
   'react': path.resolve(projectRoot, 'node_modules/react'),
+  'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
   '@react-native/virtualized-lists': path.resolve(
     projectRoot,
     'node_modules/react-native/node_modules/@react-native/virtualized-lists'
   ),
 };
-
-// 5. Disable hierarchical lookup to prevent Metro from finding modules
-//    in unexpected nested node_modules directories
-config.resolver.disableHierarchicalLookup = false;
 
 module.exports = config;
