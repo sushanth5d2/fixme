@@ -3,13 +3,47 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
 /**
- * API URL is injected by app.config.js at bundle time.
- * In Codespaces: reads CODESPACE_NAME env-var → https://<name>-3000.app.github.dev/api/v1
- * Locally:       falls back to emulator address → http://10.0.2.2:3000/api/v1
+ * API URL resolution strategy:
+ *
+ * 1. In development (Expo Go):
+ *    Use the SAME host as the Expo dev server (Metro bundler).
+ *    Metro is configured with a proxy that forwards /api/* → localhost:3000/api/*
+ *    This way the phone reaches the API through the Expo tunnel,
+ *    avoiding DNS issues with *.app.github.dev domains.
+ *
+ * 2. In production:
+ *    Use the production API domain.
  */
-const API_BASE_URL: string =
-  (Constants.expoConfig?.extra as any)?.apiUrl ??
-  'http://10.0.2.2:3000/api/v1';
+function getApiBaseUrl(): string {
+  if (!__DEV__) {
+    return 'https://api.fixme.dev/api/v1';
+  }
+
+  // Get the Expo dev server host (works for tunnel, LAN, and localhost)
+  const hostUri: string =
+    (Constants.expoConfig as any)?.hostUri ??
+    (Constants.manifest as any)?.debuggerHost ??
+    '';
+
+  if (hostUri) {
+    // hostUri is like "raldrcm-anonymous-8081.exp.direct" (tunnel)
+    // or "192.168.1.5:8081" (LAN) or "localhost:8081" (local)
+    const protocol = hostUri.includes('.exp.direct') ? 'https' : 'http';
+    // Remove port from hostUri if present, Metro proxy handles /api/* on same port
+    return `${protocol}://${hostUri}/api/v1`;
+  }
+
+  // Fallback: try Codespace URL from app.config.js
+  const configUrl = (Constants.expoConfig?.extra as any)?.apiUrl;
+  if (configUrl) return configUrl;
+
+  // Final fallback for emulator
+  return 'http://10.0.2.2:3000/api/v1';
+}
+
+const API_BASE_URL = getApiBaseUrl();
+
+console.log('[FixMe API] Using URL:', API_BASE_URL);
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN: 'fixme_access_token',

@@ -1,5 +1,6 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, '../..');
@@ -40,6 +41,31 @@ config.resolver.extraNodeModules = {
     projectRoot,
     'node_modules/react-native/node_modules/@react-native/virtualized-lists'
   ),
+};
+
+// 6. API Proxy: proxy /api/* requests to localhost:3000 so the mobile app
+//    can reach the NestJS API through the Expo tunnel without needing to
+//    resolve *.app.github.dev DNS (which some ISP DNS servers block).
+config.server = config.server || {};
+const originalEnhanceMiddleware = config.server.enhanceMiddleware;
+config.server.enhanceMiddleware = (middleware, server) => {
+  if (originalEnhanceMiddleware) {
+    middleware = originalEnhanceMiddleware(middleware, server);
+  }
+
+  // Return a handler that checks for /api/ prefix first
+  return (req, res, next) => {
+    if (req.url && req.url.startsWith('/api/')) {
+      // Proxy to the NestJS API running on localhost:3000
+      const proxy = createProxyMiddleware({
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        logLevel: 'warn',
+      });
+      return proxy(req, res, next);
+    }
+    return middleware(req, res, next);
+  };
 };
 
 module.exports = config;
