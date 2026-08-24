@@ -6,8 +6,9 @@ import {
   Matches,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@fixme/shared-types';
 import {
   PASSWORD_MIN_LENGTH,
@@ -23,6 +24,16 @@ export class SignupDto {
   @IsString()
   @Matches(/^[6-9]\d{9}$/, { message: 'mobile must be a valid 10-digit Indian mobile number' })
   mobile!: string;
+
+  @ApiPropertyOptional({ example: 'Sushanth' })
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @ApiPropertyOptional({ example: 'Chithaluri' })
+  @IsOptional()
+  @IsString()
+  lastName?: string;
 
   @ApiProperty({
     example: 'SecurePass1!',

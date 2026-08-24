@@ -111,9 +111,10 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   public async verifyOtp(
     @Body() dto: OtpVerifyDto,
-    @Body('userId') userId: string,
-  ): Promise<{ message: string }> {
-    return this.authService.verifyOtp(dto, userId);
+    @Body('userId') userId?: string,
+    @Req() req?: Request,
+  ): Promise<ReturnType<AuthService['verifyOtp']>> {
+    return this.authService.verifyOtp(dto, userId, req?.ip, req?.headers ? req.headers['user-agent'] : undefined);
   }
 
   @Post('password/forgot')

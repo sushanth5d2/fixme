@@ -4,16 +4,17 @@ import { api, apiClient } from '../services/api';
 interface User {
   id: string;
   email: string;
-  phone: string;
+  phone?: string;
   role: string;
   status: string;
 }
 
 interface FixerProfile {
   id: string;
-  companyName: string;
   ownerName: string;
-  verificationStatus: string;
+  companyName: string;
+  experienceYears: number;
+  emergencyService: boolean;
 }
 
 interface AuthState {
@@ -27,11 +28,17 @@ interface AuthState {
     email: string;
     password: string;
     phone: string;
-    firstName: string;
-    lastName: string;
+    firstName?: string;
+    lastName?: string;
+    ownerName?: string;
+    companyName?: string;
   }) => Promise<void>;
   logout: () => Promise<void>;
+  verifyOtp: (phone: string, otp: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
   checkAuth: () => Promise<void>;
+  setUser: (user: User | null) => void;
   setFixerProfile: (profile: FixerProfile | null) => void;
 }
 
@@ -43,23 +50,48 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
-    await apiClient.setTokens(data.data.accessToken, data.data.refreshToken);
+    await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
     set({ user: data.data.user, isAuthenticated: true });
   },
 
   signup: async (signupData) => {
+    const cleanMobile = signupData.phone.replace(/\D/g, '').slice(-10);
+    const name = signupData.firstName || signupData.ownerName || 'Fixer';
     const { data } = await api.post('/auth/signup', {
-      ...signupData,
+      email: signupData.email.trim().toLowerCase(),
+      mobile: cleanMobile,
+      password: signupData.password,
+      firstName: name,
+      lastName: signupData.lastName || '',
       role: 'FIXER',
     });
-    await apiClient.setTokens(data.data.accessToken, data.data.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
+    if (data?.data?.tokens) {
+      await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
+      set({ user: data.data.user, isAuthenticated: true });
+    }
   },
 
   logout: async () => {
     try { await api.post('/auth/logout'); } catch {}
     await apiClient.clearTokens();
     set({ user: null, fixerProfile: null, isAuthenticated: false });
+  },
+
+  verifyOtp: async (phone, otp) => {
+    const cleanMobile = phone.replace(/\D/g, '').slice(-10);
+    const { data } = await api.post('/auth/otp/verify', { mobile: cleanMobile, otp });
+    if (data?.data?.tokens) {
+      await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
+      set({ user: data.data.user, isAuthenticated: true });
+    }
+  },
+
+  forgotPassword: async (email) => {
+    await api.post('/auth/password/forgot', { email: email.trim().toLowerCase() });
+  },
+
+  resetPassword: async (token, password) => {
+    await api.post('/auth/password/reset', { token, newPassword: password });
   },
 
   checkAuth: async () => {
@@ -71,8 +103,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
       const { data } = await api.get('/fixers/me');
       set({
-        user: data.data?.user || null,
-        fixerProfile: data.data || null,
+        user: data.data.user,
+        fixerProfile: data.data.profile,
         isAuthenticated: true,
         isLoading: false,
       });
@@ -82,5 +114,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  setFixerProfile: (profile) => set({ fixerProfile: profile }),
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  setFixerProfile: (fixerProfile) => set({ fixerProfile }),
 }));

@@ -36,12 +36,27 @@ async function bootstrap(): Promise<void> {
   );
 
   // ── CORS ───────────────────────────────────────────────────
-  const allowedOrigins = configService
+  const isDev = configService.get<string>('NODE_ENV') !== 'production';
+  const configuredOrigins = configService
     .get<string>('CORS_ORIGINS', '')
     .split(',')
     .filter(Boolean);
+
   app.enableCors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin || isDev) {
+        return callback(null, true);
+      }
+      if (
+        configuredOrigins.includes(origin) ||
+        origin.endsWith('.app.github.dev') ||
+        origin.endsWith('.exp.direct')
+      ) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
     exposedHeaders: ['X-Request-Id'],

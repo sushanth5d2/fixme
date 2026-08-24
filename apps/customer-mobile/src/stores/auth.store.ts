@@ -4,7 +4,7 @@ import { api, apiClient } from '../services/api';
 interface User {
   id: string;
   email: string;
-  phone: string;
+  phone?: string;
   role: string;
   status: string;
 }
@@ -37,17 +37,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
-    await apiClient.setTokens(data.data.accessToken, data.data.refreshToken);
+    await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
     set({ user: data.data.user, isAuthenticated: true });
   },
 
   signup: async (signupData) => {
-    const { data } = await api.post('/auth/signup', {
-      ...signupData,
+    const cleanMobile = signupData.phone.replace(/\D/g, '').slice(-10);
+    await api.post('/auth/signup', {
+      email: signupData.email.trim().toLowerCase(),
+      mobile: cleanMobile,
+      password: signupData.password,
+      firstName: signupData.firstName.trim(),
+      lastName: signupData.lastName.trim(),
       role: 'CUSTOMER',
     });
-    await apiClient.setTokens(data.data.accessToken, data.data.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
   },
 
   logout: async () => {
@@ -61,11 +64,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   verifyOtp: async (phone, otp) => {
-    await api.post('/auth/otp/verify', { phone, otp });
+    const cleanMobile = phone.replace(/\D/g, '').slice(-10);
+    const { data } = await api.post('/auth/otp/verify', { mobile: cleanMobile, otp });
+    if (data?.data?.tokens) {
+      await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
+      set({ user: data.data.user, isAuthenticated: true });
+    }
   },
 
   forgotPassword: async (email) => {
-    await api.post('/auth/password/forgot', { email });
+    await api.post('/auth/password/forgot', { email: email.trim().toLowerCase() });
   },
 
   resetPassword: async (token, password) => {

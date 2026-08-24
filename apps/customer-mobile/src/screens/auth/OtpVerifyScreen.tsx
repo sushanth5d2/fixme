@@ -19,7 +19,7 @@ const RESEND_COOLDOWN = 30;
 
 export function OtpVerifyScreen({ route }: Props) {
   const { phone } = route.params;
-  const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''));
+  const [otp, setOtp] = useState(__DEV__ ? ['1', '2', '3', '4', '5', '6'] : Array(OTP_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_COOLDOWN);
   const inputRefs = useRef<(TextInput | null)[]>([]);
