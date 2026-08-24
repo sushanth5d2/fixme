@@ -151,6 +151,9 @@ export class RepairRequestsService {
         }
       }
 
+      const lat = dto.latitude ?? (addressSnapshot?.latitude as number) ?? null;
+      const lng = dto.longitude ?? (addressSnapshot?.longitude as number) ?? null;
+
       const request = this.requestRepo.create({
         customerId: customer.id,
         categoryId: category.id, // Must be UUID of the category
@@ -160,14 +163,33 @@ export class RepairRequestsService {
         priority: dto.priority || UrgencyLevel.MEDIUM,
         addressId: finalAddressId,
         addressSnapshot,
-        latitude: (addressSnapshot?.latitude as number) ?? null,
-        longitude: (addressSnapshot?.longitude as number) ?? null,
+        latitude: lat,
+        longitude: lng,
         preferredDate: dto.preferredDate ?? null,
         preferredTimeSlot: dto.preferredTimeSlot ?? null,
         status: RequestStatus.OPEN,
       });
 
       const saved = await this.requestRepo.save(request);
+
+      if (Array.isArray(dto.photos) && dto.photos.length > 0) {
+        for (const photoUrl of dto.photos) {
+          try {
+            await this.mediaRepo.save(
+              this.mediaRepo.create({
+                requestId: saved.id,
+                storageKey: photoUrl,
+                originalName: 'photo.jpg',
+                mimeType: 'image/jpeg',
+                sizeBytes: 1024,
+              }),
+            );
+          } catch (mediaErr) {
+            this.logger.warn(`Could not save request media: ${mediaErr}`);
+          }
+        }
+      }
+
       this.logger.log(`Repair request created: ${saved.id} by customer: ${customer.id}`);
       return saved;
     } catch (err: any) {

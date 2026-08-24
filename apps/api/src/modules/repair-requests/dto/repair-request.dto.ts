@@ -92,6 +92,18 @@ export class CreateRepairRequestDto {
   @IsOptional()
   @IsString()
   state?: string;
+
+  @ApiPropertyOptional({ example: 12.9716, description: 'Latitude of service location' })
+  @IsOptional()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 77.5946, description: 'Longitude of service location' })
+  @IsOptional()
+  longitude?: number;
+
+  @ApiPropertyOptional({ description: 'Array of photo URLs or storage keys' })
+  @IsOptional()
+  photos?: string[];
 }
 
 export class CancelRepairRequestDto {

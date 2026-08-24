@@ -8,8 +8,12 @@ import {
   Platform,
   Alert,
   TouchableOpacity,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Button, Input } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
@@ -20,7 +24,7 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'CreateRequest'>;
 const URGENCY_OPTIONS = [
   { label: 'Normal', value: 'LOW', color: Colors.info },
   { label: 'Urgent', value: 'MEDIUM', color: Colors.warning },
-  { label: 'Emergency (Same Day)', value: 'HIGH', color: Colors.error },
+  { label: 'Emergency', value: 'HIGH', color: Colors.error },
 ];
 
 const TIME_SLOTS = [
@@ -38,7 +42,10 @@ export function CreateRequestScreen({ route, navigation }: Props) {
   const [description, setDescription] = useState('');
   const [urgency, setUrgency] = useState('MEDIUM');
 
-  // Contact & Address
+  // Photos (Optional)
+  const [photos, setPhotos] = useState<string[]>([]);
+
+  // Contact & Address (Optional)
   const [contactNumber, setContactNumber] = useState('');
   const [houseBuilding, setHouseBuilding] = useState('');
   const [street, setStreet] = useState('');
@@ -47,8 +54,11 @@ export function CreateRequestScreen({ route, navigation }: Props) {
   const [city, setCity] = useState('Bengaluru');
   const [pincode, setPincode] = useState('');
   const [state, setState] = useState('Karnataka');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locating, setLocating] = useState(false);
 
-  // Schedule
+  // Schedule (Optional)
   const [preferredDate, setPreferredDate] = useState('');
   const [preferredTimeSlot, setPreferredTimeSlot] = useState('MORNING');
 
@@ -80,19 +90,92 @@ export function CreateRequestScreen({ route, navigation }: Props) {
     }).catch(() => {});
   }, []);
 
+  // Photo Picker
+  const handlePickPhoto = async () => {
+    if (photos.length >= 5) {
+      Alert.alert('Limit Reached', 'You can attach up to 5 photos.');
+      return;
+    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Needed', 'Please allow gallery access to attach photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.7,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      const uri = result.assets[0].uri;
+      setPhotos((prev) => [...prev, uri]);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    if (photos.length >= 5) {
+      Alert.alert('Limit Reached', 'You can attach up to 5 photos.');
+      return;
+    }
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Needed', 'Please allow camera access to take photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      const uri = result.assets[0].uri;
+      setPhotos((prev) => [...prev, uri]);
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // GPS Auto-detection
+  const handleDetectLocation = async () => {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please grant location access to auto-detect your area.');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setLatitude(loc.coords.latitude);
+      setLongitude(loc.coords.longitude);
+
+      const geocode = await Location.reverseGeocodeAsync({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+
+      if (geocode && geocode.length > 0) {
+        const place = geocode[0];
+        if (place.district || place.subregion || place.name) {
+          setArea(place.district || place.subregion || place.name || area);
+        }
+        if (place.city) setCity(place.city);
+        if (place.region) setState(place.region);
+        if (place.postalCode) setPincode(place.postalCode);
+        if (place.street) setStreet(place.street);
+      }
+      Alert.alert('Location Detected 📍', 'Address and location coordinates updated.');
+    } catch {
+      Alert.alert('Location Error', 'Could not detect location. Please enter address manually.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!description.trim() || description.trim().length < 10) {
-      Alert.alert('Required', 'Please describe the device problem in at least 10 characters.');
-      return;
-    }
-
-    if (!pincode.trim() || pincode.trim().length !== 6) {
-      Alert.alert('Required', 'Please enter a valid 6-digit pincode for the service location.');
-      return;
-    }
-
-    if (!houseBuilding.trim() && !street.trim() && !area.trim()) {
-      Alert.alert('Required', 'Please provide your address/area so the fixer can visit.');
+      Alert.alert('Required Field', 'Please describe the problem with your device in at least 10 characters.');
       return;
     }
 
@@ -104,23 +187,26 @@ export function CreateRequestScreen({ route, navigation }: Props) {
         description: description.trim(),
         priority: urgency,
         contactNumber: contactNumber.replace(/\D/g, '').slice(-10) || undefined,
-        houseBuilding: houseBuilding.trim(),
-        street: street.trim(),
-        area: area.trim(),
-        landmark: landmark.trim(),
+        houseBuilding: houseBuilding.trim() || undefined,
+        street: street.trim() || undefined,
+        area: area.trim() || undefined,
+        landmark: landmark.trim() || undefined,
         city: city.trim() || 'Bengaluru',
-        pincode: pincode.trim(),
+        pincode: pincode.trim() || undefined,
         state: state.trim() || 'Karnataka',
+        latitude: latitude ?? undefined,
+        longitude: longitude ?? undefined,
+        photos: photos.length > 0 ? photos : undefined,
         preferredDate: preferredDate.trim() || undefined,
         preferredTimeSlot,
       });
 
       Alert.alert(
-        'Request Posted Successfully! 🎉',
-        'Verified fixers in your area are being notified and will submit repair quotes shortly.',
+        'Request Posted! 🎉',
+        'Your repair request is live! Fixers in your area can now send you quotes.',
         [
           {
-            text: 'View My Requests',
+            text: 'View Requests',
             onPress: () => {
               navigation.goBack();
               navigation.getParent()?.navigate('RequestsTab');
@@ -135,7 +221,7 @@ export function CreateRequestScreen({ route, navigation }: Props) {
         err?.response?.data?.message ||
         err?.message ||
         'Failed to post repair request';
-      Alert.alert('Submission Failed', msg);
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
@@ -151,41 +237,24 @@ export function CreateRequestScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Category Header */}
+        {/* Category Banner */}
         <View style={styles.categoryHeader}>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>🔧 {categoryName || 'Device Repair'}</Text>
           </View>
           <Text style={styles.headerSubtitle}>
-            Fill in the device problem details and service location to receive instant quotes from verified fixers.
+            Describe the problem below to get repair quotes from verified technicians.
           </Text>
         </View>
 
-        {/* Section 1: Device Information */}
+        {/* Section 1: Problem Details (Required) */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>1. Device Details</Text>
-
-          <View style={styles.row}>
-            <Input
-              label="Brand / Manufacturer"
-              placeholder="e.g., Samsung, Apple, LG"
-              value={brandName}
-              onChangeText={setBrandName}
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              label="Model / Variant"
-              placeholder="e.g., Galaxy S23, OLED 55"
-              value={deviceModel}
-              onChangeText={setDeviceModel}
-              containerStyle={styles.halfInput}
-            />
-          </View>
+          <Text style={styles.cardTitle}>1. Problem Details <Text style={styles.requiredStar}>*</Text></Text>
 
           <View style={styles.field}>
             <Text style={styles.label}>Describe the Problem *</Text>
             <Input
-              placeholder="Explain the problem in detail (e.g. screen broken, water damage, not powering on, cooling not working, strange noise)..."
+              placeholder="What is wrong with the device? (e.g., screen cracked, not turning on, water damage, cooling issue)..."
               value={description}
               onChangeText={setDescription}
               multiline
@@ -196,8 +265,25 @@ export function CreateRequestScreen({ route, navigation }: Props) {
             <Text style={styles.charCount}>{description.length} / 2000</Text>
           </View>
 
+          <View style={styles.row}>
+            <Input
+              label="Brand (Optional)"
+              placeholder="e.g. Samsung, Apple, LG"
+              value={brandName}
+              onChangeText={setBrandName}
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              label="Model (Optional)"
+              placeholder="e.g. Galaxy S23, OLED 55"
+              value={deviceModel}
+              onChangeText={setDeviceModel}
+              containerStyle={styles.halfInput}
+            />
+          </View>
+
           {/* Urgency */}
-          <Text style={styles.label}>Repair Urgency</Text>
+          <Text style={styles.label}>Repair Urgency (Optional)</Text>
           <View style={styles.chipRow}>
             {URGENCY_OPTIONS.map((opt) => (
               <TouchableOpacity
@@ -221,12 +307,61 @@ export function CreateRequestScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* Section 2: Service Address & Contact */}
+        {/* Section 2: Upload Photos (Optional) */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>2. Service Address & Location</Text>
+          <Text style={styles.cardTitle}>2. Photos of the Issue (Optional)</Text>
+          <Text style={styles.cardSubtitle}>
+            Adding clear photos helps fixers provide accurate price quotes.
+          </Text>
+
+          <View style={styles.photoActions}>
+            <TouchableOpacity style={styles.photoBtn} onPress={handlePickPhoto}>
+              <Text style={styles.photoBtnIcon}>🖼️</Text>
+              <Text style={styles.photoBtnText}>Gallery</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.photoBtn} onPress={handleTakePhoto}>
+              <Text style={styles.photoBtnIcon}>📷</Text>
+              <Text style={styles.photoBtnText}>Take Photo</Text>
+            </TouchableOpacity>
+          </View>
+
+          {photos.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
+              {photos.map((uri, i) => (
+                <View key={i} style={styles.photoThumbContainer}>
+                  <Image source={{ uri }} style={styles.photoThumb} />
+                  <TouchableOpacity
+                    style={styles.photoRemoveBtn}
+                    onPress={() => handleRemovePhoto(i)}
+                  >
+                    <Text style={styles.photoRemoveText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Section 3: Service Location & Address (Optional) */}
+        <View style={styles.card}>
+          <View style={styles.locationHeaderRow}>
+            <Text style={styles.cardTitle}>3. Location & Contact (Optional)</Text>
+            <TouchableOpacity
+              style={styles.gpsBtn}
+              onPress={handleDetectLocation}
+              disabled={locating}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <Text style={styles.gpsBtnText}>📍 Auto-Detect</Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
           <Input
-            label="Contact Mobile Number"
+            label="Contact Number (Optional)"
             placeholder="9876543210"
             value={contactNumber}
             onChangeText={(v) => setContactNumber(v.replace(/\D/g, '').slice(0, 10))}
@@ -237,14 +372,14 @@ export function CreateRequestScreen({ route, navigation }: Props) {
 
           <View style={styles.row}>
             <Input
-              label="House / Flat / Building *"
-              placeholder="Flat 402, Sunshine Apts"
+              label="Flat / House / Building"
+              placeholder="Flat 402"
               value={houseBuilding}
               onChangeText={setHouseBuilding}
               containerStyle={styles.halfInput}
             />
             <Input
-              label="Street / Road *"
+              label="Street / Road"
               placeholder="12th Main Road"
               value={street}
               onChangeText={setStreet}
@@ -254,7 +389,7 @@ export function CreateRequestScreen({ route, navigation }: Props) {
 
           <View style={styles.row}>
             <Input
-              label="Area / Locality *"
+              label="Area / Locality"
               placeholder="Indiranagar"
               value={area}
               onChangeText={setArea}
@@ -271,7 +406,7 @@ export function CreateRequestScreen({ route, navigation }: Props) {
 
           <View style={styles.row}>
             <Input
-              label="Pincode *"
+              label="Pincode"
               placeholder="560038"
               value={pincode}
               onChangeText={(v) => setPincode(v.replace(/\D/g, '').slice(0, 6))}
@@ -289,18 +424,18 @@ export function CreateRequestScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* Section 3: Preferred Schedule */}
+        {/* Section 4: Schedule (Optional) */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>3. Preferred Appointment</Text>
+          <Text style={styles.cardTitle}>4. Preferred Time (Optional)</Text>
 
           <Input
-            label="Preferred Date (optional)"
+            label="Preferred Date"
             placeholder="YYYY-MM-DD (e.g. 2026-08-25)"
             value={preferredDate}
             onChangeText={setPreferredDate}
           />
 
-          <Text style={styles.label}>Preferred Time Slot</Text>
+          <Text style={styles.label}>Time Slot</Text>
           <View style={styles.chipRow}>
             {TIME_SLOTS.map((slot) => (
               <TouchableOpacity
@@ -324,7 +459,7 @@ export function CreateRequestScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* Submit */}
+        {/* Submit Button */}
         <View style={styles.submitSection}>
           <Button
             title="Post Repair Request"
@@ -385,7 +520,33 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.bold,
     color: Colors.text,
+    marginBottom: Spacing.xs,
+  },
+  cardSubtitle: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
     marginBottom: Spacing.md,
+  },
+  requiredStar: {
+    color: Colors.error,
+  },
+
+  locationHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  gpsBtn: {
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+  },
+  gpsBtnText: {
+    fontSize: FontSize.xs,
+    color: Colors.accent,
+    fontWeight: FontWeight.semibold,
   },
 
   row: { flexDirection: 'row', gap: Spacing.md },
@@ -403,12 +564,69 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   textArea: { marginBottom: 0 },
-  textAreaInput: { height: 100, textAlignVertical: 'top' },
+  textAreaInput: { height: 95, textAlignVertical: 'top' },
   charCount: {
     fontSize: FontSize.xs,
     color: Colors.muted,
     textAlign: 'right',
     marginTop: Spacing.xs,
+  },
+
+  // Photo Styles
+  photoActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  photoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+    backgroundColor: Colors.bg,
+    gap: Spacing.xs,
+  },
+  photoBtnIcon: { fontSize: 20 },
+  photoBtnText: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    fontWeight: FontWeight.medium,
+  },
+  photoStrip: {
+    flexDirection: 'row',
+    marginTop: Spacing.xs,
+  },
+  photoThumbContainer: {
+    position: 'relative',
+    marginRight: Spacing.md,
+  },
+  photoThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  photoRemoveBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: Colors.error,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoRemoveText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
   },
 
   chipRow: {
