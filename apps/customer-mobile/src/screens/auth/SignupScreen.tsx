@@ -57,9 +57,15 @@ export function SignupScreen({ navigation }: Props) {
       });
       navigation.replace('OtpVerify', { phone: `+91${form.phone}` });
     } catch (err: any) {
+      console.error('[Signup Error]', JSON.stringify({
+        message: err?.message,
+        status: err?.response?.status,
+        data: err?.response?.data,
+        code: err?.code,
+      }, null, 2));
       Alert.alert(
         'Signup Failed',
-        err?.response?.data?.message || 'Something went wrong',
+        err?.response?.data?.message || err?.message || 'Something went wrong',
       );
     } finally {
       setLoading(false);

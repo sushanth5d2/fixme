@@ -11,6 +11,8 @@ const API_BASE_URL: string =
   (Constants.expoConfig?.extra as any)?.apiUrl ??
   'http://10.0.2.2:3000/api/v1';
 
+console.log('[FixMe API] Using URL:', API_BASE_URL);
+
 const STORAGE_KEYS = {
   ACCESS_TOKEN: 'fixme_access_token',
   REFRESH_TOKEN: 'fixme_refresh_token',
