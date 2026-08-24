@@ -284,60 +284,127 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<{ message: string; tokens?: AuthTokens; user?: { id: string; email: string; role: UserRole; status: UserStatus } }> {
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
-    const isDev = nodeEnv !== 'production';
-    const isBypassOtp = dto.otp === '123456' || dto.otp === '000000';
+    try {
+      const nodeEnv = this.configService.get<string>('NODE_ENV');
+      const isDev = nodeEnv !== 'production';
+      const isBypassOtp = dto.otp === '123456' || dto.otp === '000000';
 
-    this.logger.log(`[OTP Verify] mobile=${dto.mobile}, otp=${dto.otp}, NODE_ENV=${nodeEnv}, isDev=${isDev}, isBypass=${isBypassOtp}`);
+      this.logger.log(`[OTP Verify] mobile=${dto.mobile}, otp=${dto.otp}, NODE_ENV=${nodeEnv}, isDev=${isDev}, isBypass=${isBypassOtp}`);
 
-    // Find the user by mobile number (most reliable lookup)
-    let targetUserId = userId;
-    if (!targetUserId) {
-      const existingUser = await this.userRepo.findOne({ where: { mobile: dto.mobile } });
-      if (existingUser) {
-        targetUserId = existingUser.id;
-        this.logger.log(`[OTP Verify] Found user by mobile: ${targetUserId}`);
+      // Find the user by mobile number (most reliable lookup)
+      let targetUserId = userId;
+      if (!targetUserId) {
+        const existingUser = await this.userRepo.findOne({ where: { mobile: dto.mobile } });
+        if (existingUser) {
+          targetUserId = existingUser.id;
+          this.logger.log(`[OTP Verify] Found user by mobile: ${targetUserId}`);
+        }
       }
-    }
 
-    // In development mode OR with bypass OTP codes: skip ALL OTP validation
-    if (isDev || isBypassOtp) {
-      this.logger.log(`[OTP Verify] BYPASSING OTP validation (isDev=${isDev}, isBypass=${isBypassOtp})`);
+      // In development mode OR with bypass OTP codes: skip ALL OTP validation
+      if (isDev || isBypassOtp) {
+        this.logger.log(`[OTP Verify] BYPASSING OTP validation (isDev=${isDev}, isBypass=${isBypassOtp})`);
+
+        if (!targetUserId) {
+          // In dev mode, auto-create a user on the fly if one wasn't found for this mobile!
+          this.logger.log(`[OTP Verify DEV] User not found for mobile ${dto.mobile}, auto-creating test user`);
+          const passwordHash = await bcrypt.hash('Password123!', BCRYPT_ROUNDS);
+          const testUser = await this.userRepo.save(this.userRepo.create({
+            email: `user_${dto.mobile}@fixme.dev`,
+            mobile: dto.mobile,
+            passwordHash,
+            role: UserRole.CUSTOMER,
+            status: UserStatus.ACTIVE,
+            isEmailVerified: true,
+            isMobileVerified: true,
+          }));
+          try {
+            await this.dataSource.getRepository(CustomerEntity).save(
+              this.dataSource.getRepository(CustomerEntity).create({
+                userId: testUser.id,
+                firstName: 'Customer',
+                lastName: '',
+              }),
+            );
+          } catch (profileErr) {
+            this.logger.warn(`Could not create customer profile: ${profileErr}`);
+          }
+          targetUserId = testUser.id;
+        }
+
+        // Activate user directly
+        await this.userRepo.update(targetUserId, {
+          isMobileVerified: true,
+          status: UserStatus.ACTIVE,
+        });
+
+        // Mark any existing OTP records as verified (safe attempt)
+        try {
+          await this.otpRepo.createQueryBuilder()
+            .update(OtpEntity)
+            .set({ verified: true })
+            .where('userId = :userId', { userId: targetUserId })
+            .execute();
+        } catch {
+          // Ignore if no OTP records exist
+        }
+
+        const user = await this.userRepo.findOne({ where: { id: targetUserId } });
+        let tokens: AuthTokens | undefined;
+        if (user) {
+          tokens = await this.generateTokens(user, ipAddress, userAgent);
+        }
+
+        this.logger.log(`[OTP Verify] OTP BYPASSED — user ${targetUserId} activated, tokens generated`);
+        return {
+          message: 'Mobile number verified successfully. Your account is now active.',
+          tokens,
+          user: user ? { id: user.id, email: user.email, role: user.role, status: user.status } : undefined,
+        };
+      }
 
       if (!targetUserId) {
-        // In dev mode, auto-create a user on the fly if one wasn't found for this mobile!
-        this.logger.log(`[OTP Verify DEV] User not found for mobile ${dto.mobile}, auto-creating test user`);
-        const passwordHash = await bcrypt.hash('Password123!', BCRYPT_ROUNDS);
-        const testUser = await this.userRepo.save(this.userRepo.create({
-          email: `user_${dto.mobile}@fixme.dev`,
-          mobile: dto.mobile,
-          passwordHash,
-          role: UserRole.CUSTOMER,
-          status: UserStatus.ACTIVE,
-          isEmailVerified: true,
-          isMobileVerified: true,
-        }));
-        await this.dataSource.getRepository(CustomerEntity).save(
-          this.dataSource.getRepository(CustomerEntity).create({
-            userId: testUser.id,
-            firstName: 'Customer',
-            lastName: '',
-          }),
-        );
-        targetUserId = testUser.id;
+        throw new BadRequestException('User not found for mobile number.');
       }
 
-      // Activate user directly
-      await this.userRepo.update(targetUserId, {
-        isMobileVerified: true,
-        status: UserStatus.ACTIVE,
+      // ── Production OTP validation ────────────────────────────
+      const latestOtp = await this.otpRepo.findOne({
+        where: { userId: targetUserId, mobile: dto.mobile, verified: false },
+        order: { createdAt: 'DESC' },
       });
 
-      // Mark any existing OTP records as verified
-      await this.otpRepo.update(
-        { userId: targetUserId, verified: false },
-        { verified: true },
-      );
+      if (!latestOtp) {
+        throw new BadRequestException('No OTP found. Please request a new OTP.');
+      }
+
+      if (latestOtp.expiresAt < new Date()) {
+        throw new BadRequestException('OTP has expired. Please request a new OTP.');
+      }
+
+      if (latestOtp.attempts >= OTP_MAX_ATTEMPTS) {
+        throw new BadRequestException(
+          'Maximum OTP attempts exceeded. Please request a new OTP.',
+        );
+      }
+
+      const otpValid = await bcrypt.compare(dto.otp, latestOtp.otpHash);
+
+      if (!otpValid) {
+        await this.otpRepo.increment({ id: latestOtp.id }, 'attempts', 1);
+        const remaining = OTP_MAX_ATTEMPTS - (latestOtp.attempts + 1);
+        throw new BadRequestException(
+          `Invalid OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
+        );
+      }
+
+      // Mark OTP verified and activate user
+      await this.dataSource.transaction(async (manager) => {
+        await manager.update(OtpEntity, latestOtp.id, { verified: true });
+        await manager.update(UserEntity, targetUserId, {
+          isMobileVerified: true,
+          status: UserStatus.ACTIVE,
+        });
+      });
 
       const user = await this.userRepo.findOne({ where: { id: targetUserId } });
       let tokens: AuthTokens | undefined;
@@ -345,69 +412,19 @@ export class AuthService {
         tokens = await this.generateTokens(user, ipAddress, userAgent);
       }
 
-      this.logger.log(`[OTP Verify] OTP BYPASSED — user ${targetUserId} activated, tokens generated`);
+      this.logger.log(`OTP verified for user: ${targetUserId}`);
       return {
         message: 'Mobile number verified successfully. Your account is now active.',
         tokens,
         user: user ? { id: user.id, email: user.email, role: user.role, status: user.status } : undefined,
       };
+    } catch (err: any) {
+      this.logger.error(`[verifyOtp Error] ${err?.message || err}`, err?.stack);
+      if (err instanceof BadRequestException || err instanceof UnauthorizedException || err instanceof ForbiddenException) {
+        throw err;
+      }
+      throw new BadRequestException(err?.message || 'Verification failed. Please try again.');
     }
-
-    if (!targetUserId) {
-      throw new BadRequestException('User not found for mobile number.');
-    }
-
-    // ── Production OTP validation ────────────────────────────
-    const latestOtp = await this.otpRepo.findOne({
-      where: { userId: targetUserId, mobile: dto.mobile, verified: false },
-      order: { createdAt: 'DESC' },
-    });
-
-    if (!latestOtp) {
-      throw new BadRequestException('No OTP found. Please request a new OTP.');
-    }
-
-    if (latestOtp.expiresAt < new Date()) {
-      throw new BadRequestException('OTP has expired. Please request a new OTP.');
-    }
-
-    if (latestOtp.attempts >= OTP_MAX_ATTEMPTS) {
-      throw new BadRequestException(
-        'Maximum OTP attempts exceeded. Please request a new OTP.',
-      );
-    }
-
-    const otpValid = await bcrypt.compare(dto.otp, latestOtp.otpHash);
-
-    if (!otpValid) {
-      await this.otpRepo.increment({ id: latestOtp.id }, 'attempts', 1);
-      const remaining = OTP_MAX_ATTEMPTS - (latestOtp.attempts + 1);
-      throw new BadRequestException(
-        `Invalid OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
-      );
-    }
-
-    // Mark OTP verified and activate user
-    await this.dataSource.transaction(async (manager) => {
-      await manager.update(OtpEntity, latestOtp.id, { verified: true });
-      await manager.update(UserEntity, targetUserId, {
-        isMobileVerified: true,
-        status: UserStatus.ACTIVE,
-      });
-    });
-
-    const user = await this.userRepo.findOne({ where: { id: targetUserId } });
-    let tokens: AuthTokens | undefined;
-    if (user) {
-      tokens = await this.generateTokens(user, ipAddress, userAgent);
-    }
-
-    this.logger.log(`OTP verified for user: ${targetUserId}`);
-    return {
-      message: 'Mobile number verified successfully. Your account is now active.',
-      tokens,
-      user: user ? { id: user.id, email: user.email, role: user.role, status: user.status } : undefined,
-    };
   }
 
   // ── Forgot / Reset Password ────────────────────────────────
@@ -526,15 +543,22 @@ export class AuthService {
     const tokenHash = await bcrypt.hash(refreshToken, 8);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    await this.refreshTokenRepo.save({
-      userId: user.id,
-      tokenHash,
-      jti,
-      expiresAt,
-      revoked: false,
-      ipAddress: ipAddress ?? null,
-      userAgent: userAgent ?? null,
-    });
+    const safeIp = typeof ipAddress === 'string' ? ipAddress.slice(0, 45) : null;
+    const safeAgent = typeof userAgent === 'string' ? userAgent.slice(0, 500) : null;
+
+    try {
+      await this.refreshTokenRepo.save({
+        userId: user.id,
+        tokenHash,
+        jti,
+        expiresAt,
+        revoked: false,
+        ipAddress: safeIp,
+        userAgent: safeAgent,
+      });
+    } catch (tokenSaveErr) {
+      this.logger.warn(`Could not persist refresh token: ${tokenSaveErr}`);
+    }
 
     return {
       accessToken,

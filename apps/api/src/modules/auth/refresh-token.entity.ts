@@ -36,7 +36,7 @@ export class RefreshTokenEntity {
   @Column({ type: 'boolean', default: false })
   revoked!: boolean;
 
-  @Column({ type: 'inet', nullable: true })
+  @Column({ name: 'ip_address', type: 'varchar', length: 64, nullable: true })
   ipAddress!: string | null;
 
   @Column({ name: 'user_agent', type: 'text', nullable: true })
