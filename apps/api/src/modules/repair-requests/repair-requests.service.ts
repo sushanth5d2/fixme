@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { RequestStatus, UserRole } from '@fixme/shared-types';
+import { RequestStatus, UserRole, UrgencyLevel } from '@fixme/shared-types';
 import { RepairRequestEntity } from './repair-request.entity';
 import { RepairRequestMediaEntity } from './repair-request-media.entity';
 import { CustomerEntity } from '../customers/customer.entity';
@@ -63,103 +63,120 @@ export class RepairRequestsService {
     userId: string,
     dto: CreateRepairRequestDto,
   ): Promise<RepairRequestEntity> {
-    const customer = await this.customerRepo.findOne({ where: { userId } });
-    if (!customer) throw new NotFoundException('Customer profile not found');
-
-    let category = await this.categoryRepo.findOne({
-      where: [{ id: dto.categoryId }, { slug: dto.categoryId }],
-    });
-
-    if (!category) {
-      // Auto-create category if missing
-      category = await this.categoryRepo.save(
-        this.categoryRepo.create({
-          name: dto.categoryId.charAt(0).toUpperCase() + dto.categoryId.slice(1),
-          slug: dto.categoryId.toLowerCase(),
-          isActive: true,
-        }),
-      );
-    }
-
-    if (dto.brandId) {
-      const brand = await this.brandRepo.findOne({ where: { id: dto.brandId, isActive: true } });
-      if (!brand) throw new NotFoundException('Device brand not found');
-    }
-
-    let addressSnapshot: Record<string, unknown> | null = null;
-    let finalAddressId = dto.addressId ?? null;
-
-    if (dto.addressId) {
-      const address = await this.addressRepo.findOne({
-        where: { id: dto.addressId, customerId: customer.id },
-      });
-      if (address) {
-        addressSnapshot = {
-          houseBuilding: address.houseBuilding,
-          street: address.street,
-          area: address.area,
-          landmark: address.landmark,
-          city: address.city,
-          state: address.state,
-          pincode: address.pincode,
-          contactNumber: dto.contactNumber || customer.user?.mobile,
-          latitude: address.latitude,
-          longitude: address.longitude,
-        };
-      }
-    } else if (dto.houseBuilding || dto.street || dto.pincode || dto.city) {
-      // Inline address provided
-      addressSnapshot = {
-        houseBuilding: dto.houseBuilding || '',
-        street: dto.street || '',
-        area: dto.area || '',
-        landmark: dto.landmark || '',
-        city: dto.city || '',
-        state: dto.state || '',
-        pincode: dto.pincode || '',
-        contactNumber: dto.contactNumber || customer.user?.mobile,
-      };
-
-      // Also persist as a customer address so customer can reuse it
-      try {
-        const savedAddr = await this.addressRepo.save(
-          this.addressRepo.create({
-            customerId: customer.id,
-            houseBuilding: dto.houseBuilding || 'Address',
-            street: dto.street || '',
-            area: dto.area || '',
-            landmark: dto.landmark || '',
-            city: dto.city || 'City',
-            state: dto.state || 'State',
-            pincode: dto.pincode || '000000',
-            isDefault: true,
+    try {
+      let customer = await this.customerRepo.findOne({ where: { userId } });
+      if (!customer) {
+        this.logger.log(`Customer profile missing for user ${userId}, auto-creating...`);
+        customer = await this.customerRepo.save(
+          this.customerRepo.create({
+            userId,
+            firstName: 'Customer',
+            lastName: '',
           }),
         );
-        finalAddressId = savedAddr.id;
-      } catch (addrErr) {
-        this.logger.warn(`Could not save inline address to customer: ${addrErr}`);
       }
+
+      let category = await this.categoryRepo.findOne({
+        where: [{ id: dto.categoryId }, { slug: dto.categoryId }],
+      });
+
+      if (!category) {
+        // Auto-create category if missing
+        category = await this.categoryRepo.save(
+          this.categoryRepo.create({
+            name: dto.categoryId.charAt(0).toUpperCase() + dto.categoryId.slice(1),
+            slug: dto.categoryId.toLowerCase(),
+            isActive: true,
+          }),
+        );
+      }
+
+      if (dto.brandId) {
+        const brand = await this.brandRepo.findOne({ where: { id: dto.brandId, isActive: true } });
+        if (!brand) throw new NotFoundException('Device brand not found');
+      }
+
+      let addressSnapshot: Record<string, unknown> | null = null;
+      let finalAddressId = dto.addressId ?? null;
+
+      if (dto.addressId) {
+        const address = await this.addressRepo.findOne({
+          where: { id: dto.addressId, customerId: customer.id },
+        });
+        if (address) {
+          addressSnapshot = {
+            houseBuilding: address.houseBuilding,
+            street: address.street,
+            area: address.area,
+            landmark: address.landmark,
+            city: address.city,
+            state: address.state,
+            pincode: address.pincode,
+            contactNumber: dto.contactNumber || null,
+            latitude: address.latitude,
+            longitude: address.longitude,
+          };
+        }
+      } else if (dto.houseBuilding || dto.street || dto.pincode || dto.city) {
+        // Inline address provided
+        addressSnapshot = {
+          houseBuilding: dto.houseBuilding || '',
+          street: dto.street || '',
+          area: dto.area || '',
+          landmark: dto.landmark || '',
+          city: dto.city || '',
+          state: dto.state || '',
+          pincode: dto.pincode || '',
+          contactNumber: dto.contactNumber || null,
+        };
+
+        // Also persist as a customer address so customer can reuse it
+        try {
+          const savedAddr = await this.addressRepo.save(
+            this.addressRepo.create({
+              customerId: customer.id,
+              houseBuilding: dto.houseBuilding || 'Address',
+              street: dto.street || '',
+              area: dto.area || '',
+              landmark: dto.landmark || '',
+              city: dto.city || 'City',
+              state: dto.state || 'State',
+              pincode: dto.pincode || '000000',
+              isDefault: true,
+            }),
+          );
+          finalAddressId = savedAddr.id;
+        } catch (addrErr) {
+          this.logger.warn(`Could not save inline address to customer: ${addrErr}`);
+        }
+      }
+
+      const request = this.requestRepo.create({
+        customerId: customer.id,
+        categoryId: category.id, // Must be UUID of the category
+        brandId: dto.brandId ?? null,
+        deviceModel: dto.deviceModel ?? null,
+        description: dto.description,
+        priority: dto.priority || UrgencyLevel.MEDIUM,
+        addressId: finalAddressId,
+        addressSnapshot,
+        latitude: (addressSnapshot?.latitude as number) ?? null,
+        longitude: (addressSnapshot?.longitude as number) ?? null,
+        preferredDate: dto.preferredDate ?? null,
+        preferredTimeSlot: dto.preferredTimeSlot ?? null,
+        status: RequestStatus.OPEN,
+      });
+
+      const saved = await this.requestRepo.save(request);
+      this.logger.log(`Repair request created: ${saved.id} by customer: ${customer.id}`);
+      return saved;
+    } catch (err: any) {
+      this.logger.error(`[Create Repair Request Error] ${err?.message || err}`, err?.stack);
+      if (err instanceof NotFoundException || err instanceof BadRequestException || err instanceof ForbiddenException) {
+        throw err;
+      }
+      throw new BadRequestException(err?.message || 'Failed to create repair request');
     }
-
-    const request = this.requestRepo.create({
-      customerId: customer.id,
-      categoryId: dto.categoryId,
-      brandId: dto.brandId ?? null,
-      deviceModel: dto.deviceModel ?? null,
-      description: dto.description,
-      priority: dto.priority,
-      addressId: finalAddressId,
-      addressSnapshot,
-      latitude: (addressSnapshot?.latitude as number) ?? null,
-      longitude: (addressSnapshot?.longitude as number) ?? null,
-      preferredDate: dto.preferredDate ?? null,
-      preferredTimeSlot: dto.preferredTimeSlot ?? null,
-      status: RequestStatus.OPEN,
-    });
-
-    const saved = await this.requestRepo.save(request);
-    this.logger.log(`Repair request created: ${saved.id} by customer: ${customer.id}`);
-    return saved;
   }
 
   // ── Customer: Own Requests ─────────────────────────────────
