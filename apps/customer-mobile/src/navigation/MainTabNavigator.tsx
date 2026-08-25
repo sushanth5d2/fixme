@@ -83,6 +83,7 @@ function ProfileNavigator() {
       <ProfileStack.Screen name="MyJobs" component={CustomerJobsListScreen} options={{ title: 'My Jobs' }} />
       <ProfileStack.Screen name="Addresses" component={AddressListScreen} options={{ title: 'My Addresses' }} />
       <ProfileStack.Screen name="AddAddress" component={AddAddressScreen} options={{ title: 'Add Address' }} />
+      <ProfileStack.Screen name="EditAddress" component={AddAddressScreen} options={{ title: 'Edit Address' }} />
       <ProfileStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <ProfileStack.Screen name="JobDetail" component={CustomerJobDetailScreen} options={{ title: 'Job Details' }} />
       <ProfileStack.Screen

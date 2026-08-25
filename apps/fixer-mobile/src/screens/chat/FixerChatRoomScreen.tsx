@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/auth.store';
@@ -18,11 +20,13 @@ interface Message {
   id: string;
   content: string;
   senderId: string;
+  sender?: { id: string; email?: string };
+  isSystemMessage?: boolean;
   createdAt: string;
 }
 
-export function FixerChatRoomScreen({ route }: any) {
-  const { conversationId } = route.params;
+export function FixerChatRoomScreen({ route, navigation }: any) {
+  const { conversationId, otherUserName } = route.params;
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,26 +34,31 @@ export function FixerChatRoomScreen({ route }: any) {
   const flatListRef = useRef<FlatList>(null);
   const user = useAuthStore((s) => s.user);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
-      const { data } = await api.get(`/chat/conversations/${conversationId}/messages?limit=50`);
+      const { data } = await api.get(`/chat/conversations/${conversationId}/messages?limit=100`);
       const raw = data?.data;
       const items: Message[] = Array.isArray(raw?.data)
         ? raw.data
         : Array.isArray(raw)
         ? raw
         : [];
+      // API returns messages descending by createdAt; reverse for bottom-up chat display
       setMessages(items.slice().reverse());
-    } catch {} finally {
+    } catch (err) {
+      console.error('[Fetch Fixer Messages Error]', err);
+    } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 4000);
-    return () => clearInterval(interval);
   }, [conversationId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessages();
+      const interval = setInterval(fetchMessages, 2000);
+      return () => clearInterval(interval);
+    }, [fetchMessages]),
+  );
 
   const handleSend = async () => {
     const content = text.trim();
@@ -57,15 +66,32 @@ export function FixerChatRoomScreen({ route }: any) {
 
     setSending(true);
     setText('');
+
+    // Optimistic message
+    const optimisticMsg: Message = {
+      id: `temp-${Date.now()}`,
+      content,
+      senderId: user?.id || '',
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+
     try {
       const { data } = await api.post('/chat/messages', {
         conversationId,
         content,
       });
-      const newMsg = data.data || data;
-      setMessages((prev) => [...prev, newMsg]);
+      const newMsg = data?.data || data;
+      // Replace optimistic message or re-fetch
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticMsg.id ? newMsg : m)),
+      );
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch {
+    } catch (err) {
+      console.error('[Send Fixer Message Error]', err);
+      // Remove optimistic message and restore text on failure
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
       setText(content);
     } finally {
       setSending(false);
@@ -73,93 +99,228 @@ export function FixerChatRoomScreen({ route }: any) {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMe = item.senderId === user?.id;
+    const isMe = item.senderId === user?.id || item.sender?.id === user?.id;
+    const isSystem = item.isSystemMessage;
+
+    if (isSystem) {
+      return (
+        <View style={styles.systemMsgContainer}>
+          <View style={styles.systemBadge}>
+            <Text style={styles.systemText}>{item.content}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    const timeStr = item.createdAt
+      ? new Date(item.createdAt).toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '';
 
     return (
-      <View style={[styles.msgRow, isMe && styles.msgRowMe]}>
-        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-          <Text style={[styles.msgText, isMe && styles.msgTextMe]}>{item.content}</Text>
-          <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
-            {new Date(item.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+      <View
+        style={[
+          styles.msgRow,
+          isMe ? styles.msgRowMe : styles.msgRowOther,
+        ]}
+      >
+        <View
+          style={[
+            styles.bubble,
+            isMe ? styles.bubbleMe : styles.bubbleOther,
+          ]}
+        >
+          {!isMe && otherUserName ? (
+            <Text style={styles.senderLabel}>{otherUserName}</Text>
+          ) : null}
+
+          <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextOther]}>
+            {item.content}
           </Text>
+
+          <View style={styles.timeRow}>
+            <Text style={[styles.msgTime, isMe ? styles.msgTimeMe : styles.msgTimeOther]}>
+              {timeStr}
+            </Text>
+            {isMe && <Text style={styles.checkmark}> ✓</Text>}
+          </View>
         </View>
       </View>
     );
   };
 
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
+  if (loading && messages.length === 0) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+        <Text style={styles.loadingText}>Loading chat...</Text>
+      </View>
+    );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
-    >
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessage}
-        contentContainerStyle={styles.messageList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        ListEmptyComponent={
-          <View style={styles.emptyChat}>
-            <Text style={styles.emptyText}>Send a greeting to your customer 👋</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        {/* Chat Top Banner */}
+        <View style={styles.chatHeaderBanner}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerPartnerName}>
+              {otherUserName || 'Customer'}
+            </Text>
+            <View style={styles.statusDotRow}>
+              <View style={styles.greenDot} />
+              <Text style={styles.statusDotText}>Live Chat with Customer</Text>
+            </View>
           </View>
-        }
-      />
+        </View>
 
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          placeholder="Message customer..."
-          placeholderTextColor={Colors.muted}
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={5000}
+        {/* Message Thread List */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.messageList}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            <View style={styles.emptyChat}>
+              <Text style={styles.emptyIcon}>💬</Text>
+              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Send a greeting and quote updates to your customer!
+              </Text>
+            </View>
+          }
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={handleSend}
-          disabled={!text.trim() || sending}
-        >
-          <Text style={styles.sendText}>Send</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+
+        {/* Input Bar */}
+        <View style={styles.inputBar}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type a message to customer..."
+            placeholderTextColor={Colors.muted}
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={5000}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              (!text.trim() || sending) && styles.sendBtnDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!text.trim() || sending}
+            activeOpacity={0.8}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Text style={styles.sendText}>Send ➤</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  messageList: { padding: Spacing.base, paddingBottom: Spacing.sm },
-  msgRow: { marginBottom: Spacing.sm, flexDirection: 'row' },
+  safeArea: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
+  loadingText: { marginTop: Spacing.sm, color: Colors.muted, fontSize: FontSize.sm },
+
+  chatHeaderBanner: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  headerInfo: { justifyContent: 'center' },
+  headerPartnerName: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  statusDotRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  greenDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' },
+  statusDotText: { fontSize: 11, color: '#16A34A', fontWeight: FontWeight.medium },
+
+  messageList: { padding: Spacing.base, paddingBottom: Spacing.md },
+
+  msgRow: { marginBottom: Spacing.sm, flexDirection: 'row', width: '100%' },
   msgRowMe: { justifyContent: 'flex-end' },
+  msgRowOther: { justifyContent: 'flex-start' },
+
   bubble: {
-    maxWidth: '75%',
-    padding: Spacing.md,
+    maxWidth: '80%',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   bubbleMe: {
     backgroundColor: Colors.accent,
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 2,
+    marginLeft: 40,
   },
   bubbleOther: {
-    backgroundColor: Colors.card,
-    borderBottomLeftRadius: 4,
+    backgroundColor: Colors.white,
+    borderBottomLeftRadius: 2,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
+    borderColor: '#E2E8F0',
+    marginRight: 40,
   },
-  msgText: { fontSize: FontSize.base, color: Colors.text, lineHeight: 20 },
+
+  senderLabel: {
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
+    color: '#8B5CF6',
+    marginBottom: 3,
+  },
+  msgText: { fontSize: FontSize.base, lineHeight: 20 },
   msgTextMe: { color: Colors.white },
-  msgTime: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 4, alignSelf: 'flex-end' },
-  msgTimeMe: { color: 'rgba(255,255,255,0.7)' },
+  msgTextOther: { color: '#1E293B' },
+
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  msgTime: { fontSize: 10 },
+  msgTimeMe: { color: 'rgba(255,255,255,0.75)' },
+  msgTimeOther: { color: Colors.muted },
+  checkmark: { fontSize: 10, color: 'rgba(255,255,255,0.9)' },
+
+  systemMsgContainer: { alignItems: 'center', marginVertical: Spacing.sm },
+  systemBadge: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  systemText: { fontSize: 11, color: Colors.textSecondary, fontStyle: 'italic' },
+
   emptyChat: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: Spacing.xxxl },
-  emptyText: { fontSize: FontSize.base, color: Colors.muted },
+  emptyIcon: { fontSize: 44, marginBottom: Spacing.sm },
+  emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
+  emptySubtitle: {
+    fontSize: FontSize.xs,
+    color: Colors.muted,
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: Spacing.xl,
+  },
+
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -167,12 +328,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
+    gap: Spacing.xs,
   },
   input: {
     flex: 1,
-    backgroundColor: Colors.bg,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.base,
+    backgroundColor: '#F1F5F9',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     fontSize: FontSize.base,
     color: Colors.text,
@@ -180,12 +342,12 @@ const styles = StyleSheet.create({
   },
   sendBtn: {
     backgroundColor: Colors.accent,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-    marginLeft: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },
-  sendText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.white },
+  sendText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.white },
 });

@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { QuoteStatus, RequestStatus, JobStatus } from '@fixme/shared-types';
+import { QuoteStatus, RequestStatus, JobStatus, UserRole } from '@fixme/shared-types';
 import { QuoteEntity } from './quote.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
@@ -171,13 +171,13 @@ export class QuotesService {
       const savedJob = await manager.save(job);
 
       // Record initial job status history
-      const history = manager.create(JobStatusHistoryEntity, {
-        jobId: savedJob.id,
-        fromStatus: null as any,
-        toStatus: JobStatus.ASSIGNED,
-        changedByUserId: customerUserId,
-        notes: 'Quote accepted by customer',
-      });
+      const history = new JobStatusHistoryEntity();
+      history.jobId = savedJob.id;
+      history.previousStatus = null;
+      history.newStatus = JobStatus.ASSIGNED;
+      history.actorId = customerUserId;
+      history.actorRole = UserRole.CUSTOMER;
+      history.note = 'Quote accepted by customer';
       await manager.save(history);
 
       // Link any conversation for this request to the new job

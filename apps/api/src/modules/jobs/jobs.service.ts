@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { JobStatus, QuoteStatus } from '@fixme/shared-types';
+import { JobStatus, QuoteStatus, UserRole } from '@fixme/shared-types';
 import { JobEntity } from './job.entity';
 import { JobStatusHistoryEntity } from './job-status-history.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
@@ -24,7 +24,7 @@ const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   [JobStatus.READY_FOR_DELIVERY]: [JobStatus.COMPLETED],
   [JobStatus.COMPLETED]: [],
   [JobStatus.CANCELLED]: [],
-  [JobStatus.DISPUTED]: [],
+  [JobStatus.DISPUTED]: [JobStatus.COMPLETED, JobStatus.CANCELLED],
 };
 
 @Injectable()
@@ -42,23 +42,25 @@ export class JobsService {
   ) {}
 
   public async updateStatus(
-    fixerUserId: string,
+    userId: string,
     jobId: string,
     dto: UpdateJobStatusDto,
   ): Promise<JobEntity> {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
-      relations: ['fixer'],
+      relations: ['fixer', 'customer'],
     });
     if (!job) throw new NotFoundException('Job not found');
-    if (job.fixer.userId !== fixerUserId) {
-      throw new ForbiddenException('You can only update your own jobs');
+
+    const fixerUserId = job.fixer.userId;
+    if (fixerUserId !== userId) {
+      throw new ForbiddenException('Only the assigned fixer can update job status');
     }
 
     const allowed = VALID_TRANSITIONS[job.status] ?? [];
     if (!allowed.includes(dto.status)) {
       throw new BadRequestException(
-        `Cannot transition from ${job.status} to ${dto.status}`,
+        `Cannot transition from ${job.status} to ${dto.status}. Allowed: [${allowed.join(', ')}]`,
       );
     }
 
@@ -76,13 +78,13 @@ export class JobsService {
       await manager.save(job);
 
       // Record status history
-      const history = manager.create(JobStatusHistoryEntity, {
-        jobId: job.id,
-        fromStatus,
-        toStatus: dto.status,
-        changedByUserId: fixerUserId,
-        notes: dto.notes ?? null,
-      });
+      const history = new JobStatusHistoryEntity();
+      history.jobId = job.id;
+      history.previousStatus = fromStatus;
+      history.newStatus = dto.status;
+      history.actorId = fixerUserId;
+      history.actorRole = UserRole.FIXER;
+      history.note = dto.notes ?? null;
       await manager.save(history);
 
       this.logger.log(`Job ${jobId}: ${fromStatus} → ${dto.status}`);
@@ -119,13 +121,13 @@ export class JobsService {
       job.cancellationReason = dto.reason;
       await manager.save(job);
 
-      const history = manager.create(JobStatusHistoryEntity, {
-        jobId: job.id,
-        fromStatus,
-        toStatus: JobStatus.CANCELLED,
-        changedByUserId: userId,
-        notes: dto.reason,
-      });
+      const history = new JobStatusHistoryEntity();
+      history.jobId = job.id;
+      history.previousStatus = fromStatus;
+      history.newStatus = JobStatus.CANCELLED;
+      history.actorId = userId;
+      history.actorRole = isFixerOwner ? UserRole.FIXER : UserRole.CUSTOMER;
+      history.note = dto.reason ?? null;
       await manager.save(history);
 
       this.logger.log(`Job ${jobId} cancelled by ${userId}`);
