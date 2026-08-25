@@ -96,7 +96,9 @@ export function FixerMainProfileScreen({ navigation }: any) {
       setCurrentPassword('');
       setNewPassword('');
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.message || 'Failed to change password');
+      console.error('[Change Password Error]', err?.response?.data || err);
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Current password is incorrect';
+      Alert.alert('Password Change Failed', msg);
     } finally {
       setSavingPassword(false);
     }

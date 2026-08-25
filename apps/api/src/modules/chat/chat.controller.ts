@@ -28,7 +28,7 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('conversations')
-  @Roles(UserRole.CUSTOMER, UserRole.FIXER)
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.FIXER_MEMBER)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a conversation for a job (or return existing)' })
   public createConversation(
@@ -39,14 +39,14 @@ export class ChatController {
   }
 
   @Get('conversations')
-  @Roles(UserRole.CUSTOMER, UserRole.FIXER)
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.FIXER_MEMBER)
   @ApiOperation({ summary: 'List my conversations' })
   public getMyConversations(@CurrentUser('sub') userId: string) {
     return this.chatService.getMyConversations(userId);
   }
 
   @Post('messages')
-  @Roles(UserRole.CUSTOMER, UserRole.FIXER)
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.FIXER_MEMBER)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send a message' })
   public sendMessage(
@@ -57,7 +57,7 @@ export class ChatController {
   }
 
   @Get('conversations/:conversationId/messages')
-  @Roles(UserRole.CUSTOMER, UserRole.FIXER)
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.FIXER_MEMBER)
   @ApiOperation({ summary: 'Get messages in a conversation (paginated, newest first)' })
   @ApiParam({ name: 'conversationId', type: 'string', format: 'uuid' })
   @ApiQuery({ name: 'page', required: false, type: 'number' })
@@ -72,7 +72,7 @@ export class ChatController {
   }
 
   @Patch('conversations/:conversationId/read')
-  @Roles(UserRole.CUSTOMER, UserRole.FIXER)
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.FIXER_MEMBER)
   @ApiOperation({ summary: 'Mark conversation as read' })
   @ApiParam({ name: 'conversationId', type: 'string', format: 'uuid' })
   public markAsRead(

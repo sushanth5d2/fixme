@@ -58,12 +58,14 @@ export class ChatService {
       if (dto.jobId) {
         const job = await this.jobRepo.findOne({
           where: { id: dto.jobId },
-          relations: ['fixer', 'customer'],
+          relations: ['fixer', 'customer', 'assignedMember'],
         });
         if (!job) throw new NotFoundException('Job not found');
 
         const isParticipant =
-          job.fixer?.userId === userId || job.customer?.userId === userId;
+          job.fixer?.userId === userId ||
+          job.customer?.userId === userId ||
+          job.assignedMember?.userId === userId;
         if (!isParticipant) {
           throw new ForbiddenException('You are not a participant of this job');
         }
@@ -72,7 +74,20 @@ export class ChatService {
         const existing = await this.conversationRepo.findOne({
           where: { jobId: dto.jobId },
         });
-        if (existing) return existing;
+        if (existing) {
+          // Ensure current user is in members
+          const isMember = await this.memberRepo.findOne({
+            where: { conversationId: existing.id, userId },
+          });
+          if (!isMember) {
+            const newMember = new ConversationMemberEntity();
+            newMember.conversationId = existing.id;
+            newMember.userId = userId;
+            newMember.role = UserRole.FIXER_MEMBER;
+            await this.memberRepo.save(newMember);
+          }
+          return existing;
+        }
 
         return await this.dataSource.transaction(async (manager) => {
           const conversation = new ConversationEntity();
@@ -82,18 +97,28 @@ export class ChatService {
 
           const members: ConversationMemberEntity[] = [];
 
-          const customerMember = new ConversationMemberEntity();
-          customerMember.conversationId = saved.id;
-          customerMember.userId = job.customer.userId;
-          customerMember.role = UserRole.CUSTOMER;
-          members.push(customerMember);
+          if (job.customer?.userId) {
+            const customerMember = new ConversationMemberEntity();
+            customerMember.conversationId = saved.id;
+            customerMember.userId = job.customer.userId;
+            customerMember.role = UserRole.CUSTOMER;
+            members.push(customerMember);
+          }
 
-          if (job.fixer.userId !== job.customer.userId) {
+          if (job.fixer?.userId && job.fixer.userId !== job.customer?.userId) {
             const fixerMember = new ConversationMemberEntity();
             fixerMember.conversationId = saved.id;
             fixerMember.userId = job.fixer.userId;
             fixerMember.role = UserRole.FIXER;
             members.push(fixerMember);
+          }
+
+          if (job.assignedMember?.userId && job.assignedMember.userId !== job.fixer?.userId) {
+            const assignedMember = new ConversationMemberEntity();
+            assignedMember.conversationId = saved.id;
+            assignedMember.userId = job.assignedMember.userId;
+            assignedMember.role = UserRole.FIXER_MEMBER;
+            members.push(assignedMember);
           }
 
           await manager.save(members);
