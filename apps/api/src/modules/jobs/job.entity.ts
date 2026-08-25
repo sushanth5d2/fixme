@@ -7,6 +7,7 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   Index,
 } from 'typeorm';
 import { JobStatus } from '@fixme/shared-types';
@@ -60,11 +61,30 @@ export class JobEntity {
   @Index()
   status!: JobStatus;
 
-  @Column({ name: 'scheduled_date', type: 'date', nullable: true })
-  scheduledDate!: string | null;
+  @Column({ name: 'agreed_total', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  agreedTotal!: number;
 
-  @Column({ name: 'scheduled_time_slot', type: 'varchar', length: 50, nullable: true })
-  scheduledTimeSlot!: string | null;
+  @Column({ name: 'warranty_days', type: 'smallint', default: 0 })
+  warrantyDays!: number;
+
+  @Column({ name: 'warranty_expires_at', type: 'date', nullable: true })
+  warrantyExpiresAt!: string | null;
+
+  @Column({ name: 'scheduled_at', type: 'timestamptz', nullable: true })
+  scheduledAt!: Date | null;
+
+  // Compatibility getter/setter for scheduledDate
+  get scheduledDate(): string | null {
+    return this.scheduledAt ? this.scheduledAt.toISOString().split('T')[0] : null;
+  }
+  set scheduledDate(val: string | null) {
+    if (val) this.scheduledAt = new Date(val);
+  }
+
+  get scheduledTimeSlot(): string | null {
+    return null;
+  }
+  set scheduledTimeSlot(_val: string | null) {}
 
   @Column({ name: 'started_at', type: 'timestamptz', nullable: true })
   startedAt!: Date | null;
@@ -78,8 +98,10 @@ export class JobEntity {
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
   cancellationReason!: string | null;
 
-  @Column({ name: 'fixer_notes', type: 'text', nullable: true })
-  fixerNotes!: string | null;
+  get fixerNotes(): string | null {
+    return null;
+  }
+  set fixerNotes(_val: string | null) {}
 
   @OneToMany(() => JobStatusHistoryEntity, (h) => h.job)
   statusHistory!: JobStatusHistoryEntity[];
@@ -89,4 +111,7 @@ export class JobEntity {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt!: Date | null;
 }
