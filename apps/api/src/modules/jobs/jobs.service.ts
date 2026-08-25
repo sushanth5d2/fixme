@@ -356,6 +356,7 @@ export class JobsService {
       .leftJoinAndSelect('job.request', 'request')
       .leftJoinAndSelect('request.category', 'category')
       .leftJoinAndSelect('request.brand', 'brand')
+      .leftJoinAndSelect('request.media', 'media')
       .leftJoinAndSelect('job.fixer', 'fixer')
       .leftJoinAndSelect('job.customer', 'customer')
       .leftJoinAndSelect('job.quote', 'quote')
@@ -397,6 +398,7 @@ export class JobsService {
         'request',
         'request.category',
         'request.brand',
+        'request.media',
         'fixer',
         'customer',
         'quote',

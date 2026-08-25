@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Modal,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { Button, Input } from '../../components/ui';
 import { InteractiveMapView } from '../../components/ui/InteractiveMapView';
@@ -55,6 +56,8 @@ interface JobDetail {
     pincode?: string;
     latitude?: number;
     longitude?: number;
+    media?: Array<{ id: string; storageKey: string }> | null;
+    photos?: string[] | null;
     addressSnapshot?: { houseBuilding?: string; area?: string; city?: string; pincode?: string } | null;
   };
   customer: { firstName?: string; lastName?: string; userId?: string };
@@ -104,6 +107,9 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
   const [revisedAmount, setRevisedAmount] = useState('');
   const [revisionReason, setRevisionReason] = useState('');
   const [submittingRevision, setSubmittingRevision] = useState(false);
+
+  // Photo Viewer Modal
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   const fetchJob = async () => {
     try {
@@ -389,6 +395,52 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
           <Text style={styles.description}>{problemText}</Text>
         </View>
 
+        {/* Customer Uploaded Photos */}
+        {((job.request?.media && job.request.media.length > 0) || (job.request?.photos && job.request.photos.length > 0)) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              📸 Customer Uploaded Photos ({((job.request.media || []).length || (job.request.photos || []).length)})
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoScroll}>
+              {(job.request.media || []).map((item, idx) => (
+                <TouchableOpacity
+                  key={item.id || idx}
+                  activeOpacity={0.85}
+                  style={styles.photoThumbCard}
+                  onPress={() => setSelectedPhoto(item.storageKey)}
+                >
+                  <Image
+                    source={{ uri: item.storageKey }}
+                    style={styles.photoThumb}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.photoZoomBadge}>
+                    <Text style={styles.photoZoomText}>🔍 View</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              {(!job.request.media || job.request.media.length === 0) && (job.request.photos || []).map((uriStr, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  activeOpacity={0.85}
+                  style={styles.photoThumbCard}
+                  onPress={() => setSelectedPhoto(uriStr)}
+                >
+                  <Image
+                    source={{ uri: uriStr }}
+                    style={styles.photoThumb}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.photoZoomBadge}>
+                    <Text style={styles.photoZoomText}>🔍 View</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Customer Location */}
         <View style={styles.section}>
           <View style={styles.mapHeaderRow}>
@@ -605,6 +657,32 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Full-Screen Customer Photo Zoom Modal */}
+      <Modal
+        visible={!!selectedPhoto}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <SafeAreaView style={styles.photoModalSafeArea}>
+          <View style={styles.photoModalHeader}>
+            <Text style={styles.photoModalTitle}>📸 Customer Uploaded Photo</Text>
+            <TouchableOpacity onPress={() => setSelectedPhoto(null)} style={styles.photoModalCloseBtn}>
+              <Text style={styles.photoModalCloseText}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.photoModalContent}>
+            {selectedPhoto && (
+              <Image
+                source={{ uri: selectedPhoto }}
+                style={styles.fullPhoto}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -820,4 +898,42 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+
+  photoScroll: { gap: Spacing.sm, paddingVertical: Spacing.xs },
+  photoThumbCard: {
+    width: 100,
+    height: 100,
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: '#F1F5F9',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  photoThumb: { width: '100%', height: '100%' },
+  photoZoomBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  photoZoomText: { color: '#FFFFFF', fontSize: 9, fontWeight: FontWeight.bold },
+
+  photoModalSafeArea: { flex: 1, backgroundColor: '#000000' },
+  photoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.md,
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+  },
+  photoModalTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#FFFFFF' },
+  photoModalCloseBtn: { paddingHorizontal: Spacing.sm, paddingVertical: 4 },
+  photoModalCloseText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#EF4444' },
+  photoModalContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  fullPhoto: { width: '100%', height: '100%' },
 });
