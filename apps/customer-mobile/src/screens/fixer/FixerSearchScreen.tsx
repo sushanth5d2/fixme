@@ -42,6 +42,19 @@ export function FixerSearchScreen({ navigation }: any) {
   const [selectedFixer, setSelectedFixer] = useState<Fixer | null>(null);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+
+  const handleZoomIn = () => {
+    setZoomLevel((z) => Math.min(Number((z + 0.25).toFixed(2)), 2.2));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((z) => Math.max(Number((z - 0.25).toFixed(2)), 0.6));
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+  };
 
   const fetchFixers = useCallback(async (searchQuery = '') => {
     setLoading(true);
@@ -268,46 +281,85 @@ export function FixerSearchScreen({ navigation }: any) {
       ) : viewMode === 'map' ? (
         /* Map Preview View */
         <View style={styles.mapContainer}>
-          <View style={styles.mapCanvas}>
-            {/* Street Grid Lines */}
-            <View style={styles.mapGridRoad1} />
-            <View style={styles.mapGridRoad2} />
-            <View style={styles.mapGridRoad3} />
-            <View style={styles.mapGridRoad4} />
+          <ScrollView
+            maximumZoomScale={2.5}
+            minimumZoomScale={0.5}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.mapScrollContent}
+          >
+            <View style={[styles.mapCanvas, { transform: [{ scale: zoomLevel }] }]}>
+              {/* Street Grid Lines */}
+              <View style={styles.mapGridRoad1} />
+              <View style={styles.mapGridRoad2} />
+              <View style={styles.mapGridRoad3} />
+              <View style={styles.mapGridRoad4} />
 
-            {/* Plotted Fixer Pins */}
-            {(fixers || []).map((fixer, index) => {
-              const isSelected = selectedFixer?.id === fixer.id;
-              const leftPos = `${15 + (index * 27) % 65}%` as any;
-              const topPos = `${15 + (index * 33) % 55}%` as any;
+              {/* Plotted Fixer Pins */}
+              {(fixers || []).map((fixer, index) => {
+                const isSelected = selectedFixer?.id === fixer.id;
+                const leftPos = `${15 + (index * 27) % 65}%` as any;
+                const topPos = `${15 + (index * 33) % 55}%` as any;
 
-              return (
-                <TouchableOpacity
-                  key={fixer.id || index}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.mapPin,
-                    { left: leftPos, top: topPos },
-                    isSelected && styles.mapPinSelected,
-                  ]}
-                  onPress={() => setSelectedFixer(fixer)}
-                >
-                  <Text style={styles.mapPinIcon}>🔧</Text>
-                  <Text style={styles.mapPinLabel} numberOfLines={1}>
-                    {fixer.companyName || fixer.ownerName}
-                  </Text>
-                  <View style={styles.pinRatingBadge}>
-                    <Text style={styles.pinRatingText}>★ {Number(fixer.averageRating || 5).toFixed(1)}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                return (
+                  <TouchableOpacity
+                    key={fixer.id || index}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.mapPin,
+                      { left: leftPos, top: topPos },
+                      isSelected && styles.mapPinSelected,
+                    ]}
+                    onPress={() => setSelectedFixer(fixer)}
+                  >
+                    <Text style={styles.mapPinIcon}>🔧</Text>
+                    <Text style={styles.mapPinLabel} numberOfLines={1}>
+                      {fixer.companyName || fixer.ownerName}
+                    </Text>
+                    <View style={styles.pinRatingBadge}>
+                      <Text style={styles.pinRatingText}>★ {Number(fixer.averageRating || 5).toFixed(1)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
 
-            {(fixers || []).length === 0 && (
-              <View style={styles.mapEmptyNotice}>
-                <Text style={styles.mapEmptyText}>No fixers found matching your search.</Text>
-              </View>
-            )}
+              {(fixers || []).length === 0 && (
+                <View style={styles.mapEmptyNotice}>
+                  <Text style={styles.mapEmptyText}>No fixers found matching your search.</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Floating Zoom Control HUD */}
+          <View style={styles.zoomControlsHud}>
+            <TouchableOpacity
+              style={styles.zoomBtn}
+              onPress={handleZoomIn}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.zoomBtnText}>＋</Text>
+            </TouchableOpacity>
+
+            <View style={styles.zoomLevelBadge}>
+              <Text style={styles.zoomLevelText}>{Math.round(zoomLevel * 100)}%</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.zoomBtn}
+              onPress={handleZoomOut}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.zoomBtnText}>－</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resetZoomBtn}
+              onPress={handleResetZoom}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.resetZoomText}>🎯</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Floating Selected Fixer Card */}
@@ -567,12 +619,52 @@ const styles = StyleSheet.create({
   viewProfileBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   mapContainer: { flex: 1, position: 'relative' },
+  mapScrollContent: { flexGrow: 1, minHeight: '100%' },
   mapCanvas: {
     flex: 1,
+    minHeight: 450,
     backgroundColor: '#E5E7EB',
     position: 'relative',
     overflow: 'hidden',
   },
+  zoomControlsHud: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: BorderRadius.lg,
+    padding: 4,
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    zIndex: 10,
+  },
+  zoomBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomBtnText: { fontSize: 18, fontWeight: FontWeight.bold, color: Colors.text },
+  zoomLevelBadge: { paddingHorizontal: 4, paddingVertical: 2 },
+  zoomLevelText: { fontSize: 9, fontWeight: FontWeight.bold, color: Colors.accent },
+  resetZoomBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resetZoomText: { fontSize: 14 },
   mapGridRoad1: { position: 'absolute', top: '25%', left: 0, right: 0, height: 18, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1D5DB' },
   mapGridRoad2: { position: 'absolute', top: '65%', left: 0, right: 0, height: 24, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1D5DB' },
   mapGridRoad3: { position: 'absolute', left: '30%', top: 0, bottom: 0, width: 18, backgroundColor: '#FFFFFF', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D1D5DB' },

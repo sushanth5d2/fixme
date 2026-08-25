@@ -73,6 +73,19 @@ export function FixerMapExplorerScreen({ navigation }: any) {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [categories, setCategories] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+
+  const handleZoomIn = () => {
+    setZoomLevel((z) => Math.min(Number((z + 0.25).toFixed(2)), 2.2));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((z) => Math.max(Number((z - 0.25).toFixed(2)), 0.6));
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+  };
 
   const fetchCategories = async () => {
     try {
@@ -308,53 +321,92 @@ export function FixerMapExplorerScreen({ navigation }: any) {
       ) : viewMode === 'map' ? (
         /* Visual Interactive Map Canvas */
         <View style={styles.mapContainer}>
-          <View style={styles.mapCanvas}>
-            {/* Map Grid Roads */}
-            <View style={styles.roadH1} />
-            <View style={styles.roadH2} />
-            <View style={styles.roadV1} />
-            <View style={styles.roadV2} />
+          <ScrollView
+            maximumZoomScale={2.5}
+            minimumZoomScale={0.5}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.mapScrollContent}
+          >
+            <View style={[styles.mapCanvas, { transform: [{ scale: zoomLevel }] }]}>
+              {/* Map Grid Roads */}
+              <View style={styles.roadH1} />
+              <View style={styles.roadH2} />
+              <View style={styles.roadV1} />
+              <View style={styles.roadV2} />
 
-            {/* Plotted Customer Request Location Markers */}
-            {(requests || []).map((req, index) => {
-              const isSelected = selectedRequest?.id === req.id;
-              const urgencyKey = req.urgency || req.priority || 'MEDIUM';
-              const urgency = URGENCY_STYLES[urgencyKey] || URGENCY_STYLES.MEDIUM;
+              {/* Plotted Customer Request Location Markers */}
+              {(requests || []).map((req, index) => {
+                const isSelected = selectedRequest?.id === req.id;
+                const urgencyKey = req.urgency || req.priority || 'MEDIUM';
+                const urgency = URGENCY_STYLES[urgencyKey] || URGENCY_STYLES.MEDIUM;
 
-              // Scatter markers across the map surface
-              const leftPos = `${12 + (index * 29) % 72}%` as any;
-              const topPos = `${10 + (index * 24) % 65}%` as any;
+                // Scatter markers across the map surface
+                const leftPos = `${12 + (index * 29) % 72}%` as any;
+                const topPos = `${10 + (index * 24) % 65}%` as any;
 
-              return (
-                <TouchableOpacity
-                  key={req.id || index}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.mapMarker,
-                    { left: leftPos, top: topPos, borderColor: urgency.border },
-                    isSelected && styles.mapMarkerSelected,
-                  ]}
-                  onPress={() => setSelectedRequest(req)}
-                >
-                  <Text style={styles.markerIcon}>{getCategoryIcon(req.category?.name)}</Text>
-                  <View style={styles.markerInfo}>
-                    <Text style={styles.markerTitle} numberOfLines={1}>
-                      {req.area || req.city || 'Customer'}
-                    </Text>
-                    <Text style={[styles.markerUrgency, { color: urgency.color }]}>
-                      {urgency.label}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                return (
+                  <TouchableOpacity
+                    key={req.id || index}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.mapMarker,
+                      { left: leftPos, top: topPos, borderColor: urgency.border },
+                      isSelected && styles.mapMarkerSelected,
+                    ]}
+                    onPress={() => setSelectedRequest(req)}
+                  >
+                    <Text style={styles.markerIcon}>{getCategoryIcon(req.category?.name)}</Text>
+                    <View style={styles.markerInfo}>
+                      <Text style={styles.markerTitle} numberOfLines={1}>
+                        {req.area || req.city || 'Customer'}
+                      </Text>
+                      <Text style={[styles.markerUrgency, { color: urgency.color }]}>
+                        {urgency.label}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
 
-            {requests.length === 0 && (
-              <View style={styles.emptyMapNotice}>
-                <Text style={styles.emptyMapTitle}>No customer requests match your filter</Text>
-                <Text style={styles.emptyMapSub}>Try clearing filters or searching another city/pincode</Text>
-              </View>
-            )}
+              {(requests || []).length === 0 && (
+                <View style={styles.emptyMapNotice}>
+                  <Text style={styles.emptyMapTitle}>No customer requests match your filter</Text>
+                  <Text style={styles.emptyMapSub}>Try clearing filters or searching another city/pincode</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Floating Zoom Control HUD */}
+          <View style={styles.zoomControlsHud}>
+            <TouchableOpacity
+              style={styles.zoomBtn}
+              onPress={handleZoomIn}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.zoomBtnText}>＋</Text>
+            </TouchableOpacity>
+
+            <View style={styles.zoomLevelBadge}>
+              <Text style={styles.zoomLevelText}>{Math.round(zoomLevel * 100)}%</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.zoomBtn}
+              onPress={handleZoomOut}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.zoomBtnText}>－</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resetZoomBtn}
+              onPress={handleResetZoom}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.resetZoomText}>🎯</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Floating Selected Request Detail Card */}
@@ -503,12 +555,52 @@ const styles = StyleSheet.create({
   chipTextActive: { color: Colors.accent, fontWeight: FontWeight.bold },
   chipTextEmergencyActive: { color: '#DC2626', fontWeight: FontWeight.bold },
   mapContainer: { flex: 1, position: 'relative' },
+  mapScrollContent: { flexGrow: 1, minHeight: '100%' },
   mapCanvas: {
     flex: 1,
+    minHeight: 450,
     backgroundColor: '#E5E7EB',
     position: 'relative',
     overflow: 'hidden',
   },
+  zoomControlsHud: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: BorderRadius.lg,
+    padding: 4,
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    zIndex: 10,
+  },
+  zoomBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomBtnText: { fontSize: 18, fontWeight: FontWeight.bold, color: Colors.text },
+  zoomLevelBadge: { paddingHorizontal: 4, paddingVertical: 2 },
+  zoomLevelText: { fontSize: 9, fontWeight: FontWeight.bold, color: Colors.accent },
+  resetZoomBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resetZoomText: { fontSize: 14 },
   roadH1: { position: 'absolute', top: '30%', left: 0, right: 0, height: 20, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1D5DB' },
   roadH2: { position: 'absolute', top: '70%', left: 0, right: 0, height: 26, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D1D5DB' },
   roadV1: { position: 'absolute', left: '25%', top: 0, bottom: 0, width: 20, backgroundColor: '#FFFFFF', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D1D5DB' },
