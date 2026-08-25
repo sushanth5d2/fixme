@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Linking,
   Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
@@ -58,15 +59,26 @@ export function RequestDetailScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      api.get(`/repair-requests/mine/${requestId}`),
-      api.get(`/quotes/request/${requestId}`).catch(() => ({ data: { data: [] } })),
-    ]).then(([reqRes, quotesRes]) => {
+  const fetchDetail = useCallback(async () => {
+    try {
+      const [reqRes, quotesRes] = await Promise.all([
+        api.get(`/repair-requests/mine/${requestId}`),
+        api.get(`/quotes/request/${requestId}`).catch(() => ({ data: { data: [] } })),
+      ]);
       setRequest(reqRes.data.data || reqRes.data);
       setQuotes(quotesRes.data.data || quotesRes.data || []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    } catch (err) {
+      console.error('[Fetch Request Detail Error]', err);
+    } finally {
+      setLoading(false);
+    }
   }, [requestId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+    }, [fetchDetail]),
+  );
 
   const handleAcceptQuote = (quoteId: string, fixerName: string, amount: number) => {
     Alert.alert(

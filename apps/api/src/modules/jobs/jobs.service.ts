@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { JobStatus, QuoteStatus, UserRole } from '@fixme/shared-types';
+import { JobStatus, QuoteStatus, UserRole, RequestStatus } from '@fixme/shared-types';
 import { JobEntity } from './job.entity';
 import { JobStatusHistoryEntity } from './job-status-history.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
@@ -77,6 +77,13 @@ export class JobsService {
 
       await manager.save(job);
 
+      // Sync linked customer repair request status
+      if (job.requestId) {
+        await manager.update(RepairRequestEntity, job.requestId, {
+          status: dto.status as unknown as RequestStatus,
+        });
+      }
+
       // Record status history
       const history = new JobStatusHistoryEntity();
       history.jobId = job.id;
@@ -87,7 +94,7 @@ export class JobsService {
       history.note = dto.notes ?? null;
       await manager.save(history);
 
-      this.logger.log(`Job ${jobId}: ${fromStatus} → ${dto.status}`);
+      this.logger.log(`Job ${jobId}: ${fromStatus} → ${dto.status} (synced request ${job.requestId})`);
       return job;
     });
   }
@@ -121,6 +128,13 @@ export class JobsService {
       job.cancellationReason = dto.reason;
       await manager.save(job);
 
+      // Sync linked customer repair request status
+      if (job.requestId) {
+        await manager.update(RepairRequestEntity, job.requestId, {
+          status: RequestStatus.CANCELLED,
+        });
+      }
+
       const history = new JobStatusHistoryEntity();
       history.jobId = job.id;
       history.previousStatus = fromStatus;
@@ -130,7 +144,7 @@ export class JobsService {
       history.note = dto.reason ?? null;
       await manager.save(history);
 
-      this.logger.log(`Job ${jobId} cancelled by ${userId}`);
+      this.logger.log(`Job ${jobId} cancelled by ${userId} (synced request ${job.requestId})`);
       return job;
     });
   }
