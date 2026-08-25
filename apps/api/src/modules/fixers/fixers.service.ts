@@ -92,7 +92,34 @@ export class FixersService implements OnModuleInit {
 
   public async onModuleInit() {
     try {
+      // Ensure enum types have FIXER_MEMBER
       await this.dataSource.query(`
+        DO $$ BEGIN
+          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'FIXER_MEMBER';
+        EXCEPTION WHEN others THEN NULL;
+        END $$;
+
+        DO $$ BEGIN
+          ALTER TYPE users_role_enum ADD VALUE IF NOT EXISTS 'FIXER_MEMBER';
+        EXCEPTION WHEN others THEN NULL;
+        END $$;
+
+        DO $$ BEGIN
+          ALTER TYPE quote_revision_status ADD VALUE IF NOT EXISTS 'NONE';
+          ALTER TYPE quote_revision_status ADD VALUE IF NOT EXISTS 'PENDING';
+          ALTER TYPE quote_revision_status ADD VALUE IF NOT EXISTS 'APPROVED';
+          ALTER TYPE quote_revision_status ADD VALUE IF NOT EXISTS 'DECLINED';
+        EXCEPTION WHEN others THEN NULL;
+        END $$;
+
+        DO $$ BEGIN
+          ALTER TYPE jobs_revision_status_enum ADD VALUE IF NOT EXISTS 'NONE';
+          ALTER TYPE jobs_revision_status_enum ADD VALUE IF NOT EXISTS 'PENDING';
+          ALTER TYPE jobs_revision_status_enum ADD VALUE IF NOT EXISTS 'APPROVED';
+          ALTER TYPE jobs_revision_status_enum ADD VALUE IF NOT EXISTS 'DECLINED';
+        EXCEPTION WHEN others THEN NULL;
+        END $$;
+
         CREATE TABLE IF NOT EXISTS fixer_members (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
           fixer_id UUID NOT NULL REFERENCES fixers(id) ON DELETE CASCADE,
@@ -117,7 +144,7 @@ export class FixersService implements OnModuleInit {
           WHEN others THEN NULL;
         END $$;
       `);
-      this.logger.log('fixer_members table and job assignment columns verified');
+      this.logger.log('fixer_members table, enum types, and job assignment columns verified');
     } catch (e: any) {
       this.logger.warn(`Could not verify fixer_members schema: ${e?.message}`);
     }
@@ -473,6 +500,19 @@ export class FixersService implements OnModuleInit {
     },
   ): Promise<FixerMemberEntity> {
     const fixer = await this.findFixerByUserOrFail(fixerUserId);
+
+    try {
+      await this.dataSource.query(`
+        DO $$ BEGIN
+          ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'FIXER_MEMBER';
+        EXCEPTION WHEN others THEN NULL;
+        END $$;
+        DO $$ BEGIN
+          ALTER TYPE users_role_enum ADD VALUE IF NOT EXISTS 'FIXER_MEMBER';
+        EXCEPTION WHEN others THEN NULL;
+        END $$;
+      `);
+    } catch {}
 
     const emailNorm = dto.email.trim().toLowerCase();
     const existingUser = await this.userRepo.findOne({ where: { email: emailNorm } });
