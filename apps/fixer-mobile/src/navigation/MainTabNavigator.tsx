@@ -1,39 +1,27 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, StyleSheet, View } from 'react-native';
-import { MainTabParamList, FeedStackParamList, JobsStackParamList, ChatStackParamList, ProfileStackParamList } from './types';
+import { Text, StyleSheet } from 'react-native';
+import {
+  MainTabParamList,
+  FeedStackParamList,
+  JobsStackParamList,
+  ChatStackParamList,
+  ProfileStackParamList,
+} from './types';
 import { RequestFeedScreen } from '../screens/home/RequestFeedScreen';
 import { SubmitQuoteScreen } from '../screens/home/SubmitQuoteScreen';
 import { MyQuotesScreen } from '../screens/home/MyQuotesScreen';
 import { MyJobsScreen } from '../screens/jobs/MyJobsScreen';
 import { FixerJobDetailScreen } from '../screens/jobs/FixerJobDetailScreen';
+import { FixerConversationListScreen } from '../screens/chat/FixerConversationListScreen';
+import { FixerChatRoomScreen } from '../screens/chat/FixerChatRoomScreen';
+import { FixerMainProfileScreen } from '../screens/profile/FixerMainProfileScreen';
+import { FixerEditProfileScreen } from '../screens/profile/FixerEditProfileScreen';
+import { FixerManageServicesScreen } from '../screens/profile/FixerManageServicesScreen';
+import { FixerManageAreasScreen } from '../screens/profile/FixerManageAreasScreen';
 import { FixerRegistrationScreen } from '../screens/profile/FixerRegistrationScreen';
-import { Colors, FontSize, FontWeight, Spacing } from '../theme/tokens';
-
-// Placeholder screens
-function PlaceholderScreen({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
-  return (
-    <View style={pStyles.container}>
-      <Text style={pStyles.icon}>{icon}</Text>
-      <Text style={pStyles.title}>{title}</Text>
-      <Text style={pStyles.subtitle}>{subtitle}</Text>
-    </View>
-  );
-}
-const pStyles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg, paddingHorizontal: Spacing.xl },
-  icon: { fontSize: 48, marginBottom: Spacing.md },
-  title: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.sm },
-  subtitle: { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center' },
-});
-
-function ChatPlaceholder() {
-  return <PlaceholderScreen icon="💬" title="Messages" subtitle="Chat with your customers" />;
-}
-function ProfilePlaceholder() {
-  return <PlaceholderScreen icon="👤" title="Profile" subtitle="Manage your business profile" />;
-}
+import { Colors, FontSize, FontWeight } from '../theme/tokens';
 
 // ── Feed Stack ──
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
@@ -54,6 +42,35 @@ function JobsNavigator() {
       <JobsStack.Screen name="JobsList" component={MyJobsScreen} options={{ headerShown: false }} />
       <JobsStack.Screen name="JobDetail" component={FixerJobDetailScreen} options={{ title: 'Job Details' }} />
     </JobsStack.Navigator>
+  );
+}
+
+// ── Chat Stack ──
+const ChatStack = createNativeStackNavigator<ChatStackParamList>();
+function ChatNavigator() {
+  return (
+    <ChatStack.Navigator screenOptions={{ headerShadowVisible: false }}>
+      <ChatStack.Screen name="ConversationList" component={FixerConversationListScreen} options={{ headerShown: false }} />
+      <ChatStack.Screen
+        name="ChatRoom"
+        component={FixerChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
+      />
+    </ChatStack.Navigator>
+  );
+}
+
+// ── Profile Stack ──
+const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+function ProfileNavigator() {
+  return (
+    <ProfileStack.Navigator screenOptions={{ headerShadowVisible: false }}>
+      <ProfileStack.Screen name="Profile" component={FixerMainProfileScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="EditProfile" component={FixerEditProfileScreen} options={{ title: 'Edit Business Profile' }} />
+      <ProfileStack.Screen name="ManageServices" component={FixerManageServicesScreen} options={{ title: 'Repair Specialties' }} />
+      <ProfileStack.Screen name="ManageAreas" component={FixerManageAreasScreen} options={{ title: 'Service Coverage' }} />
+      <ProfileStack.Screen name="Registration" component={FixerRegistrationScreen} options={{ title: 'Business Details & KYC' }} />
+    </ProfileStack.Navigator>
   );
 }
 
@@ -83,14 +100,23 @@ export function MainTabNavigator() {
       <Tab.Screen name="FeedTab" component={FeedNavigator} options={{ tabBarLabel: 'Feed' }} />
       <Tab.Screen name="MyJobsTab" component={JobsNavigator} options={{ tabBarLabel: 'My Jobs' }} />
       <Tab.Screen name="MyQuotesTab" component={MyQuotesScreen} options={{ tabBarLabel: 'Quotes' }} />
-      <Tab.Screen name="ChatTab" component={ChatPlaceholder} options={{ tabBarLabel: 'Chat' }} />
-      <Tab.Screen name="ProfileTab" component={ProfilePlaceholder} options={{ tabBarLabel: 'Profile' }} />
+      <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ tabBarLabel: 'Chat' }} />
+      <Tab.Screen name="ProfileTab" component={ProfileNavigator} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBar: { backgroundColor: Colors.white, borderTopColor: Colors.borderLight, height: 60, paddingBottom: 6, paddingTop: 4 },
+  tabBar: {
+    backgroundColor: Colors.white,
+    borderTopColor: Colors.borderLight,
+    height: 60,
+    paddingBottom: 6,
+    paddingTop: 4,
+  },
   tabIcon: { fontSize: 22 },
-  tabLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.medium },
+  tabLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+  },
 });
