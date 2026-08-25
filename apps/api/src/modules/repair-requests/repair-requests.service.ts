@@ -297,14 +297,13 @@ export class RepairRequestsService {
       .leftJoinAndSelect('req.category', 'cat')
       .leftJoinAndSelect('req.brand', 'brand')
       .leftJoinAndSelect('req.media', 'media')
-      .where('req.status IN (:...statuses)', { statuses: FIXER_VISIBLE_STATUSES })
-      .andWhere('req.deleted_at IS NULL');
+      .where('req.status IN (:...statuses)', { statuses: FIXER_VISIBLE_STATUSES });
 
     if (categoryId) {
-      query.andWhere('req.category_id = :categoryId', { categoryId });
+      query.andWhere('req.categoryId = :categoryId', { categoryId });
     }
     if (brandId) {
-      query.andWhere('(req.brand_id = :brandId OR req.brand_id IS NULL)', { brandId });
+      query.andWhere('(req.brandId = :brandId OR req.brandId IS NULL)', { brandId });
     }
     if (city) {
       query.andWhere('req.city ILIKE :city', { city: `%${city}%` });
@@ -313,7 +312,7 @@ export class RepairRequestsService {
       query.andWhere('req.pincode = :pincode', { pincode });
     }
 
-    query.orderBy('req.created_at', 'DESC').skip((page - 1) * limit).take(limit);
+    query.orderBy('req.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
 
     const [data, total] = await query.getManyAndCount();
 
@@ -410,7 +409,7 @@ export class RepairRequestsService {
     if (status) query.where('req.status = :status', { status });
     query.leftJoinAndSelect('req.category', 'cat');
     query.leftJoinAndSelect('req.brand', 'brand');
-    query.orderBy('req.created_at', 'DESC').skip((page - 1) * limit).take(limit);
+    query.orderBy('req.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
     const [data, total] = await query.getManyAndCount();
     return { data, total };
   }
