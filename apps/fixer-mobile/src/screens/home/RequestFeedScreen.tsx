@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,18 +8,35 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
 interface FeedRequest {
   id: string;
-  description: string;
+  problemTitle?: string;
+  problemDescription?: string;
+  description?: string;
   status: string;
-  priority: string;
+  priority?: string;
+  urgency?: string;
   deviceModel: string | null;
   category: { name: string };
   brand: { name: string } | null;
-  addressSnapshot: { city?: string; pincode?: string; area?: string } | null;
+  area?: string | null;
+  city?: string | null;
+  pincode?: string | null;
+  addressSnapshot?: {
+    houseBuilding?: string;
+    street?: string;
+    area?: string;
+    landmark?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
+  } | null;
   createdAt: string;
 }
 
@@ -38,20 +55,38 @@ export function RequestFeedScreen({ navigation }: any) {
   const fetchFeed = useCallback(async () => {
     try {
       const { data } = await api.get('/repair-requests/feed?limit=30');
-      setRequests(data.data || []);
-    } catch {} finally {
+      const raw = data?.data;
+      const items: FeedRequest[] = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw)
+        ? raw
+        : [];
+      setRequests(items);
+    } catch (err) {
+      console.error('[Fetch Fixer Feed Error]', err);
+      setRequests([]);
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { fetchFeed(); }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchFeed();
+    }, [fetchFeed]),
+  );
 
   const renderItem = ({ item }: { item: FeedRequest }) => {
-    const priorityColor = PRIORITY_COLORS[item.priority] || Colors.muted;
-    const location = item.addressSnapshot
-      ? `${item.addressSnapshot.area || item.addressSnapshot.city || ''}, ${item.addressSnapshot.pincode || ''}`
-      : 'Location not specified';
+    const priority = item.urgency || item.priority || 'MEDIUM';
+    const priorityColor = PRIORITY_COLORS[priority] || Colors.muted;
+    const locArea = item.area || item.addressSnapshot?.area;
+    const locCity = item.city || item.addressSnapshot?.city;
+    const locPin = item.pincode || item.addressSnapshot?.pincode;
+    const location = (locArea || locCity)
+      ? `${locArea ? locArea + ', ' : ''}${locCity || ''} ${locPin ? '(' + locPin + ')' : ''}`
+      : 'Location available';
+    const desc = item.problemDescription || item.description || '';
 
     return (
       <TouchableOpacity
@@ -61,14 +96,14 @@ export function RequestFeedScreen({ navigation }: any) {
       >
         <View style={styles.cardHeader}>
           <View style={styles.categoryRow}>
-            <Text style={styles.category}>{item.category?.name}</Text>
+            <Text style={styles.category}>{item.category?.name || 'Device Repair'}</Text>
             {item.brand && <Text style={styles.brand}> · {item.brand.name}</Text>}
           </View>
           <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
         </View>
 
         {item.deviceModel && <Text style={styles.model}>{item.deviceModel}</Text>}
-        <Text style={styles.desc} numberOfLines={3}>{item.description}</Text>
+        <Text style={styles.desc} numberOfLines={3}>{desc}</Text>
 
         <View style={styles.cardFooter}>
           <Text style={styles.location}>📍 {location}</Text>
@@ -90,7 +125,7 @@ export function RequestFeedScreen({ navigation }: any) {
     );
   };
 
-  if (loading) {
+  if (loading && requests.length === 0) {
     return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
   }
 
@@ -98,7 +133,7 @@ export function RequestFeedScreen({ navigation }: any) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Repair Requests</Text>
-        <Text style={styles.subtitle}>Open requests in your area</Text>
+        <Text style={styles.subtitle}>Open requests available for quotes ({requests.length} open)</Text>
       </View>
       <FlatList
         data={requests}
@@ -143,7 +178,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  categoryRow: { flexDirection: 'row', alignItems: 'center' },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   category: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
   brand: { fontSize: FontSize.sm, color: Colors.textSecondary },
   priorityDot: { width: 8, height: 8, borderRadius: 4 },

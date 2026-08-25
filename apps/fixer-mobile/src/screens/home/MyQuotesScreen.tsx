@@ -33,7 +33,13 @@ export function MyQuotesScreen() {
   const fetch = useCallback(async () => {
     try {
       const { data } = await api.get('/quotes/mine?limit=30');
-      setQuotes(data.data || []);
+      const raw = data?.data;
+      const items: Quote[] = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw)
+        ? raw
+        : [];
+      setQuotes(items);
     } catch {} finally { setLoading(false); setRefreshing(false); }
   }, []);
 

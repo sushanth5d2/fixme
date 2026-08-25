@@ -42,7 +42,13 @@ export function MyJobsScreen({ navigation }: any) {
   const fetchJobs = useCallback(async () => {
     try {
       const { data } = await api.get('/jobs/mine/fixer?limit=30');
-      setJobs(data.data || []);
+      const raw = data?.data;
+      const items: Job[] = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw)
+        ? raw
+        : [];
+      setJobs(items);
     } catch {} finally {
       setLoading(false);
       setRefreshing(false);

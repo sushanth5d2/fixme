@@ -294,23 +294,9 @@ export class RepairRequestsService {
 
     const query = this.requestRepo
       .createQueryBuilder('req')
-      .select([
-        'req.id',
-        'req.categoryId',
-        'req.brandId',
-        'req.deviceModel',
-        'req.description',
-        'req.priority',
-        'req.status',
-        'req.preferredDate',
-        'req.preferredTimeSlot',
-        'req.createdAt',
-        // Only safe location info — area/city/pincode, NOT full address or GPS
-      ])
-      .addSelect('cat.name', 'categoryName')
-      .addSelect('brand.name', 'brandName')
-      .leftJoin('req.category', 'cat')
-      .leftJoin('req.brand', 'brand')
+      .leftJoinAndSelect('req.category', 'cat')
+      .leftJoinAndSelect('req.brand', 'brand')
+      .leftJoinAndSelect('req.media', 'media')
       .where('req.status IN (:...statuses)', { statuses: FIXER_VISIBLE_STATUSES })
       .andWhere('req.deleted_at IS NULL');
 
@@ -321,10 +307,10 @@ export class RepairRequestsService {
       query.andWhere('(req.brand_id = :brandId OR req.brand_id IS NULL)', { brandId });
     }
     if (city) {
-      query.andWhere("req.address_snapshot->>'city' ILIKE :city", { city: `%${city}%` });
+      query.andWhere('req.city ILIKE :city', { city: `%${city}%` });
     }
     if (pincode) {
-      query.andWhere("req.address_snapshot->>'pincode' = :pincode", { pincode });
+      query.andWhere('req.pincode = :pincode', { pincode });
     }
 
     query.orderBy('req.created_at', 'DESC').skip((page - 1) * limit).take(limit);
@@ -336,18 +322,36 @@ export class RepairRequestsService {
       id: req.id,
       categoryId: req.categoryId,
       brandId: req.brandId,
+      category: req.category,
+      brand: req.brand,
+      media: req.media,
       deviceModel: req.deviceModel,
       problemTitle: req.problemTitle,
       problemDescription: req.problemDescription,
-      description: req.description,
-      priority: req.priority,
+      description: req.problemDescription || req.description,
+      priority: req.urgency || req.priority,
       urgency: req.urgency,
       status: req.status,
+      houseBuilding: req.houseBuilding,
+      street: req.street,
       area: req.area,
+      landmark: req.landmark,
       city: req.city,
+      state: req.state,
       pincode: req.pincode,
       latitude: req.latitude,
       longitude: req.longitude,
+      addressSnapshot: {
+        houseBuilding: req.houseBuilding,
+        street: req.street,
+        area: req.area,
+        landmark: req.landmark,
+        city: req.city,
+        state: req.state,
+        pincode: req.pincode,
+        latitude: req.latitude,
+        longitude: req.longitude,
+      },
       preferredDate: req.preferredDate,
       preferredTime: req.preferredTime,
       createdAt: req.createdAt,
