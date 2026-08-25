@@ -77,7 +77,8 @@ export function FixerMapExplorerScreen({ navigation }: any) {
   const fetchCategories = async () => {
     try {
       const { data } = await api.get('/categories');
-      setCategories(data?.data || data || []);
+      const cats = data?.data?.data || data?.data || data;
+      setCategories(Array.isArray(cats) ? cats : []);
     } catch {}
   };
 
@@ -88,7 +89,8 @@ export function FixerMapExplorerScreen({ navigation }: any) {
       if (selectedCategory) params.categoryId = selectedCategory;
 
       const { data } = await api.get('/repair-requests/feed', { params });
-      let list: RepairRequest[] = data?.data || data || [];
+      const raw = data?.data?.data || data?.data || data;
+      let list: RepairRequest[] = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
 
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
@@ -111,6 +113,8 @@ export function FixerMapExplorerScreen({ navigation }: any) {
       }
     } catch (err) {
       console.error('[Fetch Map Feed Error]', err);
+      setRequests([]);
+      setSelectedRequest(null);
     } finally {
       setLoading(false);
     }
@@ -281,7 +285,7 @@ export function FixerMapExplorerScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
 
-          {categories.map((c) => (
+          {(categories || []).map((c) => (
             <TouchableOpacity
               key={c.id}
               style={[styles.chip, selectedCategory === c.id && styles.chipActive]}
@@ -312,7 +316,7 @@ export function FixerMapExplorerScreen({ navigation }: any) {
             <View style={styles.roadV2} />
 
             {/* Plotted Customer Request Location Markers */}
-            {requests.map((req, index) => {
+            {(requests || []).map((req, index) => {
               const isSelected = selectedRequest?.id === req.id;
               const urgencyKey = req.urgency || req.priority || 'MEDIUM';
               const urgency = URGENCY_STYLES[urgencyKey] || URGENCY_STYLES.MEDIUM;

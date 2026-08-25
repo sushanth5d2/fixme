@@ -310,8 +310,8 @@ export class FixersService {
     limit = 20,
   ): Promise<{ data: FixerEntity[]; total: number; page: number; limit: number }> {
     const query = this.fixerRepo.createQueryBuilder('fixer');
-    if (status) query.where('fixer.verification_status = :status', { status });
-    query.orderBy('fixer.created_at', 'DESC');
+    if (status) query.where('fixer.verificationStatus = :status', { status });
+    query.orderBy('fixer.createdAt', 'DESC');
     query.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await query.getManyAndCount();
@@ -338,7 +338,7 @@ export class FixersService {
       .leftJoinAndSelect('fixer.services', 'svc')
       .leftJoinAndSelect('svc.category', 'cat')
       .leftJoinAndSelect('fixer.serviceAreas', 'area')
-      .where('fixer.verification_status IN (:...statuses)', {
+      .where('fixer.verificationStatus IN (:...statuses)', {
         statuses: [
           FixerVerificationStatus.VERIFIED,
           FixerVerificationStatus.REGISTERED,
@@ -349,28 +349,28 @@ export class FixersService {
     if (searchParam && searchParam.trim()) {
       const term = `%${searchParam.trim()}%`;
       qb.andWhere(
-        '(fixer.company_name ILIKE :term OR fixer.owner_name ILIKE :term OR fixer.city ILIKE :term OR fixer.pincode ILIKE :term OR fixer.address_line ILIKE :term OR area.area_name ILIKE :term OR area.city ILIKE :term OR area.pincode ILIKE :term)',
+        '(fixer.companyName ILIKE :term OR fixer.ownerName ILIKE :term OR fixer.city ILIKE :term OR fixer.pincode ILIKE :term OR fixer.addressLine ILIKE :term OR area.city ILIKE :term OR area.pincode ILIKE :term)',
         { term },
       );
     }
 
     if (name && name.trim()) {
-      qb.andWhere('(fixer.company_name ILIKE :name OR fixer.owner_name ILIKE :name)', {
+      qb.andWhere('(fixer.companyName ILIKE :name OR fixer.ownerName ILIKE :name)', {
         name: `%${name.trim()}%`,
       });
     }
 
     if (location && location.trim()) {
-      qb.andWhere('(fixer.address_line ILIKE :loc OR area.area_name ILIKE :loc OR fixer.city ILIKE :loc)', {
+      qb.andWhere('(fixer.addressLine ILIKE :loc OR fixer.city ILIKE :loc OR area.city ILIKE :loc)', {
         loc: `%${location.trim()}%`,
       });
     }
 
     if (categoryId) {
-      qb.andWhere('svc.category_id = :categoryId', { categoryId });
+      qb.andWhere('svc.categoryId = :categoryId', { categoryId });
     }
     if (brandId) {
-      qb.andWhere('(svc.brand_id = :brandId OR svc.brand_id IS NULL)', { brandId });
+      qb.andWhere('(svc.brandId = :brandId OR svc.brandId IS NULL)', { brandId });
     }
     if (city && city.trim()) {
       qb.andWhere(
@@ -386,8 +386,8 @@ export class FixersService {
     }
 
     qb
-      .orderBy('fixer.average_rating', 'DESC')
-      .addOrderBy('fixer.completed_jobs', 'DESC')
+      .orderBy('fixer.averageRating', 'DESC')
+      .addOrderBy('fixer.completedJobs', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 

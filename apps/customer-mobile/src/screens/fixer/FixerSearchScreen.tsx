@@ -64,19 +64,23 @@ export function FixerSearchScreen({ navigation }: any) {
       if (selectedCategory) params.categoryId = selectedCategory;
 
       const { data } = await api.get('/fixers/search', { params });
-      const list = data?.data || data || [];
+      const raw = data?.data?.data || data?.data || data;
+      const list: Fixer[] = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
       const filtered = onlyEmergency ? list.filter((f: Fixer) => f.emergencyService) : list;
       setFixers(filtered);
-      if (filtered.length > 0 && !selectedFixer) {
+      if (filtered.length > 0) {
         setSelectedFixer(filtered[0]);
+      } else {
+        setSelectedFixer(null);
       }
     } catch (err) {
       console.error('[Search Fixers Error]', err);
       setFixers([]);
+      setSelectedFixer(null);
     } finally {
       setLoading(false);
     }
-  }, [selectedCity, selectedCategory, onlyEmergency, selectedFixer]);
+  }, [selectedCity, selectedCategory, onlyEmergency]);
 
   useEffect(() => {
     fetchFixers(query);
@@ -240,7 +244,7 @@ export function FixerSearchScreen({ navigation }: any) {
             <View style={styles.mapGridRoad4} />
 
             {/* Render Fixer Location Pins */}
-            {fixers.map((fixer, index) => {
+            {(fixers || []).map((fixer, index) => {
               const isSelected = selectedFixer?.id === fixer.id;
               // Deterministic spread of pins across the canvas based on index/id
               const leftPos = `${15 + (index * 27) % 65}%` as any;
