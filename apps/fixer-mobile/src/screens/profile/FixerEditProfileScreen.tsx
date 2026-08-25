@@ -9,7 +9,9 @@ import {
   Alert,
   Switch,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { Button, Input } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
@@ -24,11 +26,14 @@ export function FixerEditProfileScreen({ navigation }: any) {
     city: '',
     state: '',
     pincode: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
     emergencyService: false,
     workingHoursStart: '09:00',
     workingHoursEnd: '19:00',
   });
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
@@ -42,9 +47,11 @@ export function FixerEditProfileScreen({ navigation }: any) {
           experienceYears: String(p.experienceYears || '1'),
           description: p.description || '',
           addressLine: p.addressLine || '',
-          city: p.city || '',
-          state: p.state || '',
+          city: p.city || 'Bengaluru',
+          state: p.state || 'Karnataka',
           pincode: p.pincode || '',
+          latitude: p.latitude ?? null,
+          longitude: p.longitude ?? null,
           emergencyService: !!p.emergencyService,
           workingHoursStart: p.workingHoursStart || '09:00',
           workingHoursEnd: p.workingHoursEnd || '19:00',
@@ -59,6 +66,43 @@ export function FixerEditProfileScreen({ navigation }: any) {
   }, []);
 
   const update = (k: string, v: any) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleDetectLocation = async () => {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please grant location access to auto-detect your workshop area.');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      update('latitude', lat);
+      update('longitude', lng);
+
+      const geocode = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+
+      if (geocode && geocode.length > 0) {
+        const place = geocode[0];
+        const streetPart = [place.name, place.street, place.district || place.subregion]
+          .filter(Boolean)
+          .join(', ');
+        if (streetPart) update('addressLine', streetPart);
+        if (place.city) update('city', place.city);
+        if (place.region) update('state', place.region);
+        if (place.postalCode) update('pincode', place.postalCode);
+      }
+      Alert.alert('Location Detected 📍', 'Workshop address and GPS coordinates have been auto-filled.');
+    } catch {
+      Alert.alert('Location Error', 'Could not auto-detect location. Please enter workshop address manually.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!form.companyName.trim() || !form.ownerName.trim()) {
@@ -77,12 +121,14 @@ export function FixerEditProfileScreen({ navigation }: any) {
         city: form.city.trim() || undefined,
         state: form.state.trim() || undefined,
         pincode: form.pincode.replace(/\D/g, '').slice(0, 6) || undefined,
+        latitude: form.latitude ?? undefined,
+        longitude: form.longitude ?? undefined,
         emergencyService: form.emergencyService,
         workingHoursStart: form.workingHoursStart,
         workingHoursEnd: form.workingHoursEnd,
       });
 
-      Alert.alert('Success', 'Business profile updated successfully!', [
+      Alert.alert('Success 🎉', 'Business profile and workshop address updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (err: any) {
@@ -105,6 +151,7 @@ export function FixerEditProfileScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {/* Business Information */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Business Information</Text>
 
@@ -141,11 +188,25 @@ export function FixerEditProfileScreen({ navigation }: any) {
           />
         </View>
 
+        {/* Workshop Address & Location */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Workshop Address</Text>
+          <View style={styles.addressHeaderRow}>
+            <Text style={styles.cardTitle}>Workshop Address</Text>
+            <TouchableOpacity
+              style={styles.detectLocationBtn}
+              onPress={handleDetectLocation}
+              disabled={locating}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <Text style={styles.detectLocationText}>📍 Auto-Detect GPS</Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
           <Input
-            label="Shop / Building & Street"
+            label="Shop / Building & Street Name"
             value={form.addressLine}
             onChangeText={(v) => update('addressLine', v)}
             placeholder="Shop 4, 1st Cross, Main Road"
@@ -153,26 +214,42 @@ export function FixerEditProfileScreen({ navigation }: any) {
 
           <View style={styles.row}>
             <Input
-              label="City"
+              label="City / District"
               value={form.city}
               onChangeText={(v) => update('city', v)}
               containerStyle={styles.half}
               placeholder="Bengaluru"
             />
             <Input
-              label="Pincode"
-              value={form.pincode}
-              onChangeText={(v) => update('pincode', v.replace(/\D/g, '').slice(0, 6))}
+              label="State"
+              value={form.state}
+              onChangeText={(v) => update('state', v)}
               containerStyle={styles.half}
-              keyboardType="number-pad"
-              maxLength={6}
-              placeholder="560001"
+              placeholder="Karnataka"
             />
           </View>
+
+          <Input
+            label="Pincode (6 digits)"
+            value={form.pincode}
+            onChangeText={(v) => update('pincode', v.replace(/\D/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+            placeholder="560001"
+          />
+
+          {form.latitude && form.longitude ? (
+            <View style={styles.gpsBadge}>
+              <Text style={styles.gpsText}>
+                📍 Coordinates: {Number(form.latitude).toFixed(4)}, {Number(form.longitude).toFixed(4)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
+        {/* Availability & Emergency */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Availability & Emergency</Text>
+          <Text style={styles.cardTitle}>Availability & Working Hours</Text>
 
           <View style={styles.switchRow}>
             <View style={styles.switchInfo}>
@@ -232,6 +309,29 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   cardTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.xs },
+  addressHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  detectLocationBtn: {
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  detectLocationText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent },
+  gpsBadge: {
+    backgroundColor: '#F1F5F9',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+  },
+  gpsText: { fontSize: FontSize.xs, color: Colors.muted, fontWeight: FontWeight.medium },
   row: { flexDirection: 'row', gap: Spacing.md },
   half: { flex: 1 },
   switchRow: {

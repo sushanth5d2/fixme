@@ -59,8 +59,17 @@ export function FixerConversationListScreen({ navigation }: any) {
     if (!q) return conversations;
 
     return conversations.filter((conv) => {
-      const otherMember = conv.members?.find((m) => m.user?.id !== user?.id) || conv.members?.[0];
-      const otherName = (otherMember?.user?.email?.split('@')[0] || 'Customer').toLowerCase();
+      const myUserId = (user as any)?.userId || user?.id;
+      const otherMember =
+        conv.members?.find((m: any) => m.role === 'CUSTOMER') ||
+        conv.members?.find((m: any) => m.userId !== myUserId && m.user?.id !== myUserId) ||
+        conv.members?.[0];
+      const otherName = (
+        otherMember?.displayName ||
+        conv.otherPartyName ||
+        otherMember?.customer?.firstName ||
+        (otherMember?.user?.email ? otherMember.user.email.split('@')[0] : 'Customer')
+      ).toLowerCase();
       const email = (otherMember?.user?.email || '').toLowerCase();
       const preview = (conv.lastMessagePreview || '').toLowerCase();
 
@@ -75,7 +84,13 @@ export function FixerConversationListScreen({ navigation }: any) {
       item.members?.find((m: any) => m.role === 'CUSTOMER') ||
       item.members?.find((m: any) => m.userId !== myUserId && m.user?.id !== myUserId) ||
       item.members?.[0];
-    const otherName = otherMember?.user?.email ? otherMember.user.email.split('@')[0] : 'Customer';
+    const otherName =
+      otherMember?.displayName ||
+      item.otherPartyName ||
+      (otherMember?.customer?.firstName
+        ? `${otherMember.customer.firstName}${otherMember.customer.lastName ? ' ' + otherMember.customer.lastName : ''}`
+        : '') ||
+      (otherMember?.user?.email ? otherMember.user.email.split('@')[0] : 'Customer');
 
     return (
       <TouchableOpacity

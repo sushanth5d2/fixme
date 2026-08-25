@@ -59,8 +59,18 @@ export function ConversationListScreen({ navigation }: any) {
     if (!q) return conversations;
 
     return conversations.filter((conv) => {
-      const otherMember = conv.members?.find((m) => m.user?.id !== user?.id) || conv.members?.[0];
-      const otherName = (otherMember?.user?.email?.split('@')[0] || 'Fixer').toLowerCase();
+      const myUserId = (user as any)?.userId || user?.id;
+      const otherMember =
+        conv.members?.find((m: any) => m.role === 'FIXER') ||
+        conv.members?.find((m: any) => m.userId !== myUserId && m.user?.id !== myUserId) ||
+        conv.members?.[0];
+      const otherName = (
+        otherMember?.displayName ||
+        conv.otherPartyName ||
+        otherMember?.fixer?.companyName ||
+        otherMember?.fixer?.ownerName ||
+        (otherMember?.user?.email ? otherMember.user.email.split('@')[0] : 'Fixer')
+      ).toLowerCase();
       const email = (otherMember?.user?.email || '').toLowerCase();
       const preview = (conv.lastMessagePreview || '').toLowerCase();
 
@@ -75,7 +85,12 @@ export function ConversationListScreen({ navigation }: any) {
       item.members?.find((m: any) => m.role === 'FIXER') ||
       item.members?.find((m: any) => m.userId !== myUserId && m.user?.id !== myUserId) ||
       item.members?.[0];
-    const otherName = otherMember?.user?.email ? otherMember.user.email.split('@')[0] : 'Fixer Specialist';
+    const otherName =
+      otherMember?.displayName ||
+      item.otherPartyName ||
+      otherMember?.fixer?.companyName ||
+      otherMember?.fixer?.ownerName ||
+      (otherMember?.user?.email ? otherMember.user.email.split('@')[0] : 'Fixer Specialist');
 
     return (
       <TouchableOpacity

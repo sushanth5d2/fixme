@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { UserRole } from '@fixme/shared-types';
 import { ConversationEntity } from './conversation.entity';
 import { ConversationMemberEntity } from './conversation-member.entity';
@@ -293,7 +293,7 @@ export class ChatService {
 
   public async getMyConversations(
     userId: string,
-  ): Promise<ConversationEntity[]> {
+  ): Promise<any[]> {
     try {
       const myMemberships = await this.memberRepo.find({
         where: { userId },
@@ -311,7 +311,60 @@ export class ChatService {
         .addOrderBy('conv.createdAt', 'DESC')
         .getMany();
 
-      return conversations;
+      const allUserIds = Array.from(
+        new Set(
+          conversations.flatMap((c) => c.members?.map((m) => m.userId) || []),
+        ),
+      );
+
+      const [customers, fixers] = await Promise.all([
+        allUserIds.length > 0
+          ? this.customerRepo.find({ where: { userId: In(allUserIds) } })
+          : [],
+        allUserIds.length > 0
+          ? this.fixerRepo.find({ where: { userId: In(allUserIds) } })
+          : [],
+      ]);
+
+      const customerMap = new Map(customers.map((c) => [c.userId, c]));
+      const fixerMap = new Map(fixers.map((f) => [f.userId, f]));
+
+      return conversations.map((conv) => {
+        const enrichedMembers = (conv.members || []).map((m) => {
+          const cust = customerMap.get(m.userId);
+          const fix = fixerMap.get(m.userId);
+          let displayName = '';
+          if (cust) {
+            displayName =
+              cust.firstName ||
+              `${cust.firstName || ''} ${cust.lastName || ''}`.trim();
+          } else if (fix) {
+            displayName = fix.companyName || fix.ownerName;
+          }
+          return {
+            ...m,
+            displayName:
+              displayName ||
+              (m.user?.email ? m.user.email.split('@')[0] : 'User'),
+            customer: cust
+              ? { firstName: cust.firstName, lastName: cust.lastName }
+              : null,
+            fixer: fix
+              ? { companyName: fix.companyName, ownerName: fix.ownerName }
+              : null,
+          };
+        });
+
+        // Resolve other party display name
+        const otherMember = enrichedMembers.find((m) => m.userId !== userId);
+        const otherPartyName = otherMember?.displayName || 'User';
+
+        return {
+          ...conv,
+          members: enrichedMembers,
+          otherPartyName,
+        };
+      });
     } catch (err) {
       this.logger.error('Failed to get my conversations', err);
       return [];
