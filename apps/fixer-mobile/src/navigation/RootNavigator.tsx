@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { MainTabNavigator } from './MainTabNavigator';
-import { FixerLoginScreen, FixerSignupScreen } from '../screens/auth/FixerAuthScreens';
+import { FixerLoginScreen, FixerSignupScreen, FixerOtpVerifyScreen } from '../screens/auth/FixerAuthScreens';
 import { useAuthStore } from '../stores/auth.store';
 import { Colors } from '../theme/tokens';
 import { AuthStackParamList } from './types';
@@ -15,6 +15,7 @@ function AuthNavigator() {
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <AuthStack.Screen name="Login" component={FixerLoginScreen} />
       <AuthStack.Screen name="Signup" component={FixerSignupScreen} />
+      <AuthStack.Screen name="OtpVerify" component={FixerOtpVerifyScreen} />
     </AuthStack.Navigator>
   );
 }

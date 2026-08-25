@@ -18,6 +18,7 @@ import {
   UserStatus,
   AuthTokens,
   JwtPayload,
+  FixerVerificationStatus,
 } from '@fixme/shared-types';
 import { BCRYPT_ROUNDS, OTP_LENGTH, OTP_EXPIRY_MINUTES, OTP_MAX_ATTEMPTS } from '@fixme/validation';
 import { UserEntity } from '../users/user.entity';
@@ -107,12 +108,18 @@ export class AuthService {
           if (fix) {
             await manager.update(FixerEntity, fix.id, {
               ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : fix.ownerName,
+              verificationStatus: FixerVerificationStatus.VERIFIED,
             });
           } else {
             await manager.save(manager.create(FixerEntity, {
               userId: existing.id,
               ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : 'Fixer',
               companyName: dto.firstName ? `${dto.firstName}'s Repairs` : 'Repair Service',
+              addressLine: 'Shop 1, Main Road',
+              city: 'Bengaluru',
+              state: 'Karnataka',
+              pincode: '560001',
+              verificationStatus: FixerVerificationStatus.VERIFIED,
             }));
           }
         }
@@ -152,6 +159,11 @@ export class AuthService {
           userId: user.id,
           ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : 'Fixer',
           companyName: dto.firstName ? `${dto.firstName}'s Repairs` : 'Repair Service',
+          addressLine: 'Shop 1, Main Road',
+          city: 'Bengaluru',
+          state: 'Karnataka',
+          pincode: '560001',
+          verificationStatus: isDev ? FixerVerificationStatus.VERIFIED : FixerVerificationStatus.REGISTERED,
         });
         await manager.save(fixer);
       }

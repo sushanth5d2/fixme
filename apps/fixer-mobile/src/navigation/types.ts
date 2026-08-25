@@ -1,6 +1,7 @@
 export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
+  OtpVerify: { phone: string };
   Registration: undefined; // Fixer business registration
 };
 

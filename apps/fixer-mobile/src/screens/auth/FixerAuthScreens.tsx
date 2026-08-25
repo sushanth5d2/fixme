@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity } from 'react-native';
 import { Button, Input, PasswordInput } from '../../components/ui';
-import { Colors, FontSize, FontWeight, Spacing } from '../../theme/tokens';
+import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { useAuthStore } from '../../stores/auth.store';
 
 export function FixerLoginScreen({ navigation }: any) {
@@ -16,7 +16,9 @@ export function FixerLoginScreen({ navigation }: any) {
     try {
       await login(email.trim().toLowerCase(), password);
     } catch (err: any) {
-      Alert.alert('Login Failed', err?.response?.data?.message || 'Invalid credentials');
+      console.error('[Fixer Login Error]', err?.response?.data || err);
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Invalid credentials';
+      Alert.alert('Login Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -54,15 +56,23 @@ export function FixerSignupScreen({ navigation }: any) {
   const update = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const handleSignup = async () => {
-    if (!form.firstName || !form.email.includes('@') || form.password.length < 8) {
-      Alert.alert('Error', 'Please fill all fields correctly');
+    if (!form.firstName.trim() || !form.email.includes('@') || form.password.length < 8) {
+      Alert.alert('Required', 'Please enter your name, valid email, and a password of at least 8 characters.');
       return;
     }
+    if (form.phone.replace(/\D/g, '').length < 10) {
+      Alert.alert('Required', 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await signup({ ...form, phone: `+91${form.phone}` });
+      await signup({ ...form, phone: form.phone.replace(/\D/g, '').slice(-10) });
+      navigation.navigate('OtpVerify', { phone: form.phone.replace(/\D/g, '').slice(-10) });
     } catch (err: any) {
-      Alert.alert('Signup Failed', err?.response?.data?.message || 'Something went wrong');
+      console.error('[Fixer Signup Error]', err?.response?.data || err);
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Failed to create fixer account';
+      Alert.alert('Signup Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -72,7 +82,7 @@ export function FixerSignupScreen({ navigation }: any) {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Register as Fixer</Text>
-        <Text style={styles.subtitle}>Create your professional repair account</Text>
+        <Text style={styles.subtitle}>Create your professional technician account to start receiving repair leads</Text>
 
         <View style={styles.row}>
           <Input label="First Name" value={form.firstName} onChangeText={(v) => update('firstName', v)} containerStyle={styles.half} placeholder="Ravi" />
@@ -82,8 +92,65 @@ export function FixerSignupScreen({ navigation }: any) {
         <Input label="Mobile" value={form.phone} onChangeText={(v) => update('phone', v.replace(/\D/g, '').slice(0, 10))} keyboardType="phone-pad" maxLength={10} placeholder="9876543210" />
         <PasswordInput label="Password" value={form.password} onChangeText={(v) => update('password', v)} placeholder="Min. 8 characters" />
 
-        <Button title="Create Account" onPress={handleSignup} loading={loading} size="lg" />
+        <Button title="Create Account & Continue" onPress={handleSignup} loading={loading} size="lg" />
         <Button title="Already have an account? Sign In" onPress={() => navigation.goBack()} variant="ghost" size="sm" />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+export function FixerOtpVerifyScreen({ route, navigation }: any) {
+  const { phone } = route.params;
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const verifyOtp = useAuthStore((s) => s.verifyOtp);
+
+  const handleVerify = async () => {
+    if (!otp.trim() || otp.trim().length < 6) {
+      Alert.alert('Required', 'Please enter the 6-digit OTP (use 123456 in test mode).');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await verifyOtp(phone, otp.trim());
+    } catch (err: any) {
+      console.error('[Fixer OTP Error]', err?.response?.data || err);
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Invalid OTP';
+      Alert.alert('Verification Failed', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <Text style={styles.logo}>📲</Text>
+          <Text style={styles.title}>Verify Mobile Number</Text>
+          <Text style={styles.subtitle}>Enter the 6-digit code sent to +91 {phone}</Text>
+        </View>
+
+        <Input
+          label="6-Digit OTP"
+          placeholder="123456"
+          value={otp}
+          onChangeText={(v) => setOtp(v.replace(/\D/g, '').slice(0, 6))}
+          keyboardType="number-pad"
+          maxLength={6}
+          style={{ fontSize: 24, textAlign: 'center', letterSpacing: 8 }}
+        />
+
+        <TouchableOpacity
+          style={styles.devBypassBox}
+          onPress={() => setOtp('123456')}
+        >
+          <Text style={styles.devBypassText}>⚡ Testing? Tap here to autofill test OTP (123456)</Text>
+        </TouchableOpacity>
+
+        <Button title="Verify & Get Started" onPress={handleVerify} loading={loading} size="lg" />
+        <Button title="Change Mobile Number" onPress={() => navigation.goBack()} variant="ghost" size="sm" />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -100,4 +167,18 @@ const styles = StyleSheet.create({
   footerText: { fontSize: FontSize.sm, color: Colors.textSecondary },
   row: { flexDirection: 'row', gap: Spacing.md },
   half: { flex: 1 },
+  devBypassBox: {
+    backgroundColor: Colors.accentSoft,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginVertical: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  devBypassText: {
+    fontSize: FontSize.xs,
+    color: Colors.accent,
+    textAlign: 'center',
+    fontWeight: FontWeight.semibold,
+  },
 });
