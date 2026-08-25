@@ -7,10 +7,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { JobStatus, QuoteStatus, UserRole, RequestStatus } from '@fixme/shared-types';
+import {
+  JobStatus,
+  QuoteStatus,
+  UserRole,
+  RequestStatus,
+  QuoteRevisionStatus,
+} from '@fixme/shared-types';
 import { JobEntity } from './job.entity';
 import { JobStatusHistoryEntity } from './job-status-history.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
+import { FixerMemberEntity } from '../fixers/fixer-member.entity';
 import { QuoteEntity } from '../quotes/quote.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { UpdateJobStatusDto, CancelJobDto, ScheduleJobDto } from './dto/job.dto';
@@ -48,13 +55,22 @@ export class JobsService {
   ): Promise<JobEntity> {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
-      relations: ['fixer', 'customer'],
+      relations: ['fixer', 'customer', 'assignedMember'],
     });
     if (!job) throw new NotFoundException('Job not found');
 
-    const fixerUserId = job.fixer.userId;
-    if (fixerUserId !== userId) {
-      throw new ForbiddenException('Only the assigned fixer can update job status');
+    const member = await this.dataSource
+      .getRepository(FixerMemberEntity)
+      .findOne({ where: { userId } });
+    const isFixerOwner = job.fixer.userId === userId;
+    const isAssignedMember =
+      member &&
+      (job.assignedMemberId === member.id || job.fixerId === member.fixerId);
+
+    if (!isFixerOwner && !isAssignedMember) {
+      throw new ForbiddenException(
+        'Only the assigned fixer or technician can update job status',
+      );
     }
 
     const allowed = VALID_TRANSITIONS[job.status] ?? [];
@@ -89,14 +105,122 @@ export class JobsService {
       history.jobId = job.id;
       history.previousStatus = fromStatus;
       history.newStatus = dto.status;
-      history.actorId = fixerUserId;
-      history.actorRole = UserRole.FIXER;
+      history.actorId = userId;
+      history.actorRole = isFixerOwner ? UserRole.FIXER : UserRole.FIXER_MEMBER;
       history.note = dto.notes ?? null;
       await manager.save(history);
 
-      this.logger.log(`Job ${jobId}: ${fromStatus} → ${dto.status} (synced request ${job.requestId})`);
+      this.logger.log(
+        `Job ${jobId}: ${fromStatus} → ${dto.status} (synced request ${job.requestId})`,
+      );
       return job;
     });
+  }
+
+  public async assignMember(
+    userId: string,
+    jobId: string,
+    memberId: string | null,
+  ): Promise<JobEntity> {
+    const job = await this.jobRepo.findOne({
+      where: { id: jobId },
+      relations: ['fixer', 'assignedMember'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+
+    if (job.fixer.userId !== userId) {
+      throw new ForbiddenException('Only the fixer shop owner can assign members');
+    }
+
+    if (job.status !== JobStatus.ASSIGNED) {
+      throw new BadRequestException(
+        'Technicians can only be assigned before the job is in progress / en route',
+      );
+    }
+
+    if (memberId) {
+      const member = await this.dataSource
+        .getRepository(FixerMemberEntity)
+        .findOne({
+          where: { id: memberId, fixerId: job.fixerId },
+        });
+      if (!member) throw new NotFoundException('Member not found in your team');
+      job.assignedMemberId = member.id;
+    } else {
+      job.assignedMemberId = null;
+    }
+
+    await this.jobRepo.save(job);
+    this.logger.log(`Job ${jobId} assigned to member: ${memberId || 'none'}`);
+    return this.getJobById(userId, jobId);
+  }
+
+  public async requestRevision(
+    userId: string,
+    jobId: string,
+    dto: { revisedTotal: number; notes: string },
+  ): Promise<JobEntity> {
+    const job = await this.jobRepo.findOne({
+      where: { id: jobId },
+      relations: ['fixer'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+
+    const member = await this.dataSource
+      .getRepository(FixerMemberEntity)
+      .findOne({ where: { userId } });
+    const isOwner = job.fixer.userId === userId;
+    const isMember =
+      member &&
+      (job.assignedMemberId === member.id || job.fixerId === member.fixerId);
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException(
+        'Only the assigned fixer or technician can request quote revision',
+      );
+    }
+
+    job.revisedTotal = dto.revisedTotal;
+    job.revisionNotes = dto.notes;
+    job.revisionStatus = QuoteRevisionStatus.PENDING;
+
+    await this.jobRepo.save(job);
+    this.logger.log(`Job ${jobId} revision requested: ₹${dto.revisedTotal}`);
+    return this.getJobById(userId, jobId);
+  }
+
+  public async respondRevision(
+    customerUserId: string,
+    jobId: string,
+    dto: { accept: boolean },
+  ): Promise<JobEntity> {
+    const job = await this.jobRepo.findOne({
+      where: { id: jobId },
+      relations: ['customer'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+
+    if (job.customer.userId !== customerUserId) {
+      throw new ForbiddenException(
+        'Only the customer can approve or decline quote revisions',
+      );
+    }
+
+    if (job.revisionStatus !== QuoteRevisionStatus.PENDING) {
+      throw new BadRequestException('No pending quote revision request on this job');
+    }
+
+    if (dto.accept) {
+      job.agreedTotal = job.revisedTotal || job.agreedTotal;
+      job.revisionStatus = QuoteRevisionStatus.APPROVED;
+    } else {
+      job.revisionStatus = QuoteRevisionStatus.DECLINED;
+    }
+
+    await this.jobRepo.save(job);
+    this.logger.log(
+      `Job ${jobId} revision responded by customer: ${dto.accept ? 'APPROVED' : 'DECLINED'}`,
+    );
+    return this.getJobById(customerUserId, jobId);
   }
 
   public async cancel(
@@ -133,7 +257,8 @@ export class JobsService {
         const otherQuotesCount = await manager.count(QuoteEntity, {
           where: { requestId: job.requestId, status: QuoteStatus.SUBMITTED },
         });
-        const resetStatus = otherQuotesCount > 0 ? RequestStatus.QUOTED : RequestStatus.OPEN;
+        const resetStatus =
+          otherQuotesCount > 0 ? RequestStatus.QUOTED : RequestStatus.OPEN;
         await manager.update(RepairRequestEntity, job.requestId, {
           status: resetStatus,
         });
@@ -155,20 +280,24 @@ export class JobsService {
       history.note = dto.reason ?? null;
       await manager.save(history);
 
-      this.logger.log(`Job ${jobId} cancelled by ${userId} (synced request ${job.requestId})`);
+      this.logger.log(
+        `Job ${jobId} cancelled by ${userId} (synced request ${job.requestId})`,
+      );
       return job;
     });
   }
 
   public async getMyJobs(
     userId: string,
-    role: 'customer' | 'fixer',
+    role: 'customer' | 'fixer' | 'fixer_member',
     page = 1,
-    limit = 20,
+    limit = 50,
   ): Promise<{ data: JobEntity[]; total: number }> {
     if (role === 'fixer') {
       try {
-        const fixer = await this.dataSource.getRepository(FixerEntity).findOne({ where: { userId } });
+        const fixer = await this.dataSource
+          .getRepository(FixerEntity)
+          .findOne({ where: { userId } });
         if (fixer) {
           const acceptedQuotes = await this.dataSource
             .getRepository(QuoteEntity)
@@ -180,9 +309,13 @@ export class JobsService {
             .getMany();
 
           for (const aq of acceptedQuotes) {
-            const existingJob = await this.jobRepo.findOne({ where: { quoteId: aq.id } });
+            const existingJob = await this.jobRepo.findOne({
+              where: { quoteId: aq.id },
+            });
             if (!existingJob) {
-              const request = await this.dataSource.getRepository(RepairRequestEntity).findOne({ where: { id: aq.requestId } });
+              const request = await this.dataSource
+                .getRepository(RepairRequestEntity)
+                .findOne({ where: { id: aq.requestId } });
               if (request) {
                 const backfillJob = new JobEntity();
                 backfillJob.requestId = aq.requestId;
@@ -209,10 +342,26 @@ export class JobsService {
       .leftJoinAndSelect('request.brand', 'brand')
       .leftJoinAndSelect('job.fixer', 'fixer')
       .leftJoinAndSelect('job.customer', 'customer')
-      .leftJoinAndSelect('job.quote', 'quote');
+      .leftJoinAndSelect('job.quote', 'quote')
+      .leftJoinAndSelect('job.assignedMember', 'assignedMember');
 
     if (role === 'fixer') {
       qb.where('fixer.userId = :userId', { userId });
+    } else if (role === 'fixer_member') {
+      const member = await this.dataSource
+        .getRepository(FixerMemberEntity)
+        .findOne({ where: { userId } });
+      if (member) {
+        qb.where(
+          '(job.assignedMemberId = :memberId OR (job.fixerId = :fixerId AND job.assignedMemberId IS NULL))',
+          {
+            memberId: member.id,
+            fixerId: member.fixerId,
+          },
+        );
+      } else {
+        qb.where('1 = 0');
+      }
     } else {
       qb.where('customer.userId = :userId', { userId });
     }
@@ -225,17 +374,30 @@ export class JobsService {
     return { data, total };
   }
 
-  public async getJobById(
-    userId: string,
-    jobId: string,
-  ): Promise<JobEntity> {
+  public async getJobById(userId: string, jobId: string): Promise<JobEntity> {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
-      relations: ['request', 'request.category', 'request.brand', 'fixer', 'customer', 'quote', 'statusHistory'],
+      relations: [
+        'request',
+        'request.category',
+        'request.brand',
+        'fixer',
+        'customer',
+        'quote',
+        'statusHistory',
+        'assignedMember',
+      ],
     });
     if (!job) throw new NotFoundException('Job not found');
 
-    if (job.fixer.userId !== userId && job.customer.userId !== userId) {
+    const member = await this.dataSource
+      .getRepository(FixerMemberEntity)
+      .findOne({ where: { userId } });
+    const isMember =
+      member &&
+      (job.assignedMemberId === member.id || job.fixerId === member.fixerId);
+
+    if (job.fixer.userId !== userId && job.customer.userId !== userId && !isMember) {
       throw new ForbiddenException('Not authorized to view this job');
     }
     return job;

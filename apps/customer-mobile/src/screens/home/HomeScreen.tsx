@@ -38,6 +38,18 @@ const CATEGORY_ICONS: Record<string, string> = {
   other: '🛠️',
 };
 
+interface RecentRequest {
+  id: string;
+  problemTitle?: string;
+  problemDescription?: string;
+  description?: string;
+  status: string;
+  deviceModel?: string | null;
+  category?: { name: string };
+  brand?: { name: string } | null;
+  createdAt: string;
+}
+
 interface Category {
   id: string;
   name: string;
@@ -46,9 +58,12 @@ interface Category {
 
 interface MyRequest {
   id: string;
-  description: string;
+  problemTitle?: string;
+  problemDescription?: string;
+  description?: string;
   status: string;
-  category: { name: string };
+  category?: { name: string };
+  brand?: { name: string } | null;
   createdAt: string;
 }
 

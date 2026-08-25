@@ -302,8 +302,8 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   msgText: { fontSize: FontSize.base, lineHeight: 21 },
-  msgTextMe: { color: '#FFFFFF', fontWeight: FontWeight.normal },
-  msgTextOther: { color: '#0F172A', fontWeight: FontWeight.normal },
+  msgTextMe: { color: '#FFFFFF', fontWeight: FontWeight.regular },
+  msgTextOther: { color: '#0F172A', fontWeight: FontWeight.regular },
 
   timeRow: {
     flexDirection: 'row',

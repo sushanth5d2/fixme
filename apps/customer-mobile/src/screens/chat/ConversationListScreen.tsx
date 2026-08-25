@@ -19,7 +19,8 @@ interface Conversation {
   lastMessageAt: string | null;
   lastMessagePreview?: string | null;
   isActive: boolean;
-  members: Array<{ user: { id: string; email: string } }>;
+  otherPartyName?: string | null;
+  members: Array<any>;
 }
 
 export function ConversationListScreen({ navigation }: any) {

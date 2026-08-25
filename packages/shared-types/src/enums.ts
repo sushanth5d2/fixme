@@ -5,8 +5,16 @@
 export enum UserRole {
   CUSTOMER = 'CUSTOMER',
   FIXER = 'FIXER',
+  FIXER_MEMBER = 'FIXER_MEMBER',
   ADMIN = 'ADMIN',
   SUPER_ADMIN = 'SUPER_ADMIN',
+}
+
+export enum QuoteRevisionStatus {
+  NONE = 'NONE',
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  DECLINED = 'DECLINED',
 }
 
 export enum UserStatus {

@@ -23,8 +23,8 @@ export function FixerManageAreasScreen({ navigation }: any) {
   useEffect(() => {
     const loadAreas = async () => {
       try {
-        const { data } = await api.get('/fixers/me/areas').catch(() => null);
-        const areas = data?.data || [];
+        const res = await api.get('/fixers/me/areas').catch(() => null);
+        const areas = res?.data?.data || res?.data || [];
         if (Array.isArray(areas) && areas.length > 0) {
           const pins = areas.map((a: any) => a.pincode).filter(Boolean);
           if (pins.length > 0) setPincodes(pins);

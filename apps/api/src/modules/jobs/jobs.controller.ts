@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Body,
   Param,
@@ -27,8 +28,8 @@ export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
   @Patch(':jobId/status')
-  @Roles(UserRole.FIXER)
-  @ApiOperation({ summary: '[Fixer] Update job status (state machine enforced)' })
+  @Roles(UserRole.FIXER, UserRole.FIXER_MEMBER)
+  @ApiOperation({ summary: '[Fixer/Technician] Update job status (state machine enforced)' })
   @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
   public updateStatus(
     @CurrentUser('sub') userId: string,
@@ -36,6 +37,44 @@ export class JobsController {
     @Body() dto: UpdateJobStatusDto,
   ) {
     return this.jobsService.updateStatus(userId, jobId, dto);
+  }
+
+  @Patch(':jobId/assign-member')
+  @Roles(UserRole.FIXER)
+  @ApiOperation({ summary: '[Fixer Owner] Assign or reassign a technician/member to a job' })
+  @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
+  public assignMember(
+    @CurrentUser('sub') userId: string,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+    @Body() dto: { memberId: string | null },
+  ) {
+    return this.jobsService.assignMember(userId, jobId, dto.memberId);
+  }
+
+  @Post(':jobId/request-revision')
+  @Roles(UserRole.FIXER, UserRole.FIXER_MEMBER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[Fixer] Request quote revision after acceptance' })
+  @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
+  public requestRevision(
+    @CurrentUser('sub') userId: string,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+    @Body() dto: { revisedTotal: number; notes: string },
+  ) {
+    return this.jobsService.requestRevision(userId, jobId, dto);
+  }
+
+  @Patch(':jobId/respond-revision')
+  @Roles(UserRole.CUSTOMER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[Customer] Approve or decline a quote revision request' })
+  @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
+  public respondRevision(
+    @CurrentUser('sub') userId: string,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+    @Body() dto: { accept: boolean },
+  ) {
+    return this.jobsService.respondRevision(userId, jobId, dto);
   }
 
   @Patch(':jobId/cancel')
@@ -52,7 +91,7 @@ export class JobsController {
   }
 
   @Patch(':jobId/schedule')
-  @Roles(UserRole.FIXER)
+  @Roles(UserRole.FIXER, UserRole.FIXER_MEMBER)
   @ApiOperation({ summary: '[Fixer] Schedule a job date/time' })
   @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
   public schedule(
@@ -71,9 +110,22 @@ export class JobsController {
   public getMyFixerJobs(
     @CurrentUser('sub') userId: string,
     @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('limit') limit = 50,
   ) {
     return this.jobsService.getMyJobs(userId, 'fixer', Number(page), Math.min(Number(limit), 100));
+  }
+
+  @Get(['mine/member', 'member/mine'])
+  @Roles(UserRole.FIXER_MEMBER, UserRole.FIXER)
+  @ApiOperation({ summary: '[Staff/Member] List jobs assigned to this technician' })
+  @ApiQuery({ name: 'page', required: false, type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number' })
+  public getMyMemberJobs(
+    @CurrentUser('sub') userId: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 50,
+  ) {
+    return this.jobsService.getMyJobs(userId, 'fixer_member', Number(page), Math.min(Number(limit), 100));
   }
 
   @Get(['mine/customer', 'customer/mine'])
@@ -84,14 +136,14 @@ export class JobsController {
   public getMyCustomerJobs(
     @CurrentUser('sub') userId: string,
     @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('limit') limit = 50,
   ) {
     return this.jobsService.getMyJobs(userId, 'customer', Number(page), Math.min(Number(limit), 100));
   }
 
   @Get(':jobId')
-  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Get job details (only owner or admin)' })
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.FIXER_MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get job details' })
   @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
   public getJobById(
     @CurrentUser('sub') userId: string,

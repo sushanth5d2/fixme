@@ -101,11 +101,31 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ isLoading: false, isAuthenticated: false });
         return;
       }
-      const { data } = await api.get('/fixers/me');
-      const profile = data.data;
-      const userData = profile?.user
-        ? { ...profile.user, fixerId: profile.id, userId: profile.userId || profile.user.id }
-        : { id: profile?.userId || profile?.id, userId: profile?.userId || profile?.id, ...profile };
+      let userData: any = null;
+      let profile: any = null;
+      try {
+        const { data } = await api.get('/fixers/me');
+        profile = data?.data?.profile || data?.data;
+        userData = profile?.user
+          ? { ...profile.user, fixerId: profile.id, userId: profile.userId || profile.user.id, role: 'FIXER' }
+          : { id: profile?.userId || profile?.id, userId: profile?.userId || profile?.id, role: 'FIXER', ...profile };
+      } catch (err: any) {
+        if (err?.response?.status === 403) {
+          const { data } = await api.get('/fixers/me/member-profile');
+          profile = data?.data || data;
+          userData = {
+            id: profile?.userId || profile?.id,
+            userId: profile?.userId || profile?.id,
+            fullName: profile?.fullName,
+            email: profile?.email,
+            role: 'FIXER_MEMBER',
+            fixerId: profile?.fixerId,
+          };
+        } else {
+          throw err;
+        }
+      }
+
       set({
         user: userData,
         fixerProfile: profile,

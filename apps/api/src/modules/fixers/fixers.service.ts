@@ -5,20 +5,25 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, IsNull } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import {
   FixerVerificationStatus,
   DocumentStatus,
   UserRole,
+  UserStatus,
 } from '@fixme/shared-types';
 import { FixerEntity } from './fixer.entity';
+import { FixerMemberEntity } from './fixer-member.entity';
 import { FixerDocumentEntity } from './fixer-document.entity';
 import { FixerServiceEntity } from './fixer-service.entity';
 import { FixerServiceAreaEntity } from './fixer-service-area.entity';
 import { DeviceCategoryEntity } from '../categories/device-category.entity';
 import { DeviceBrandEntity } from '../brands/device-brand.entity';
+import { UserEntity } from '../users/user.entity';
 import {
   RegisterFixerDto,
   UpdateFixerProfileDto,
@@ -31,8 +36,15 @@ import {
 const ALLOWED_VERIFICATION_TRANSITIONS: Partial<
   Record<FixerVerificationStatus, FixerVerificationStatus[]>
 > = {
+  [FixerVerificationStatus.REGISTERED]: [
+    FixerVerificationStatus.DOCUMENT_SUBMITTED,
+    FixerVerificationStatus.UNDER_REVIEW,
+    FixerVerificationStatus.VERIFIED,
+  ],
   [FixerVerificationStatus.DOCUMENT_SUBMITTED]: [
     FixerVerificationStatus.UNDER_REVIEW,
+    FixerVerificationStatus.VERIFIED,
+    FixerVerificationStatus.REJECTED,
   ],
   [FixerVerificationStatus.UNDER_REVIEW]: [
     FixerVerificationStatus.VERIFIED,
@@ -47,12 +59,15 @@ const ALLOWED_VERIFICATION_TRANSITIONS: Partial<
 };
 
 @Injectable()
-export class FixersService {
+export class FixersService implements OnModuleInit {
   private readonly logger = new Logger(FixersService.name);
 
   constructor(
     @InjectRepository(FixerEntity)
     private readonly fixerRepo: Repository<FixerEntity>,
+
+    @InjectRepository(FixerMemberEntity)
+    private readonly memberRepo: Repository<FixerMemberEntity>,
 
     @InjectRepository(FixerDocumentEntity)
     private readonly documentRepo: Repository<FixerDocumentEntity>,
@@ -69,8 +84,44 @@ export class FixersService {
     @InjectRepository(DeviceBrandEntity)
     private readonly brandRepo: Repository<DeviceBrandEntity>,
 
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
+
     private readonly dataSource: DataSource,
   ) {}
+
+  public async onModuleInit() {
+    try {
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS fixer_members (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          fixer_id UUID NOT NULL REFERENCES fixers(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+          full_name VARCHAR(200) NOT NULL,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          phone VARCHAR(15) NOT NULL,
+          profile_photo_key TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_fixer_members_fixer_id ON fixer_members(fixer_id);
+        CREATE INDEX IF NOT EXISTS idx_fixer_members_user_id ON fixer_members(user_id);
+
+        DO $$ BEGIN
+          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS assigned_member_id UUID REFERENCES fixer_members(id) ON DELETE SET NULL;
+          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS revised_total DECIMAL(10,2);
+          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS revision_notes TEXT;
+          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS revision_status VARCHAR(50) DEFAULT 'NONE';
+        EXCEPTION
+          WHEN others THEN NULL;
+        END $$;
+      `);
+      this.logger.log('fixer_members table and job assignment columns verified');
+    } catch (e: any) {
+      this.logger.warn(`Could not verify fixer_members schema: ${e?.message}`);
+    }
+  }
 
   // ── Registration ───────────────────────────────────────────
 
@@ -407,5 +458,106 @@ export class FixersService {
     const fixer = await this.fixerRepo.findOne({ where: { id: fixerId } });
     if (!fixer) throw new NotFoundException('Fixer not found');
     return fixer;
+  }
+
+  // ── Fixer Team Members / Staff ──────────────────────────────
+
+  public async createMember(
+    fixerUserId: string,
+    dto: {
+      fullName: string;
+      email: string;
+      phone: string;
+      password: string;
+      profilePhotoKey?: string;
+    },
+  ): Promise<FixerMemberEntity> {
+    const fixer = await this.findFixerByUserOrFail(fixerUserId);
+
+    const emailNorm = dto.email.trim().toLowerCase();
+    const existingUser = await this.userRepo.findOne({ where: { email: emailNorm } });
+    if (existingUser) {
+      throw new ConflictException('An account with this email address already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    return this.dataSource.transaction(async (manager) => {
+      const user = manager.create(UserEntity, {
+        email: emailNorm,
+        mobile: dto.phone.replace(/\D/g, '').slice(-10),
+        passwordHash,
+        role: UserRole.FIXER_MEMBER,
+        status: UserStatus.ACTIVE,
+        isEmailVerified: true,
+        isMobileVerified: true,
+      });
+      const savedUser = await manager.save(user);
+
+      const member = manager.create(FixerMemberEntity, {
+        fixerId: fixer.id,
+        userId: savedUser.id,
+        fullName: dto.fullName.trim(),
+        email: emailNorm,
+        phone: dto.phone.trim(),
+        profilePhotoKey: dto.profilePhotoKey || null,
+        isActive: true,
+      });
+
+      const savedMember = await manager.save(member);
+      this.logger.log(`Fixer member added: ${savedMember.fullName} for business: ${fixer.companyName}`);
+      return savedMember;
+    });
+  }
+
+  public async getMembers(fixerUserId: string): Promise<FixerMemberEntity[]> {
+    const fixer = await this.findFixerByUserOrFail(fixerUserId);
+    return this.memberRepo.find({
+      where: { fixerId: fixer.id },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  public async deleteMember(fixerUserId: string, memberId: string): Promise<{ message: string }> {
+    const fixer = await this.findFixerByUserOrFail(fixerUserId);
+    const member = await this.memberRepo.findOne({
+      where: { id: memberId, fixerId: fixer.id },
+    });
+    if (!member) throw new NotFoundException('Team member not found');
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(FixerMemberEntity, member.id);
+      await manager.delete(UserEntity, member.userId);
+    });
+
+    this.logger.log(`Fixer member deleted: ${member.id}`);
+    return { message: 'Member removed successfully' };
+  }
+
+  public async resetMemberPassword(
+    fixerUserId: string,
+    memberId: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const fixer = await this.findFixerByUserOrFail(fixerUserId);
+    const member = await this.memberRepo.findOne({
+      where: { id: memberId, fixerId: fixer.id },
+    });
+    if (!member) throw new NotFoundException('Team member not found');
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.userRepo.update(member.userId, { passwordHash });
+
+    this.logger.log(`Password reset for fixer member: ${member.id}`);
+    return { message: 'Password reset successfully' };
+  }
+
+  public async getMyMemberProfile(memberUserId: string): Promise<any> {
+    const member = await this.memberRepo.findOne({
+      where: { userId: memberUserId },
+      relations: ['fixer'],
+    });
+    if (!member) throw new NotFoundException('Member profile not found');
+    return member;
   }
 }

@@ -37,13 +37,13 @@ export function Input({
       <View
         style={[
           styles.inputWrapper,
-          focused && styles.inputFocused,
-          error && styles.inputError,
+          focused ? styles.inputFocused : undefined,
+          error ? styles.inputError : undefined,
         ]}
       >
         {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
         <RNTextInput
-          style={[styles.input, leftIcon && styles.inputWithLeft, rightIcon && styles.inputWithRight, style]}
+          style={[styles.input, leftIcon ? styles.inputWithLeft : undefined, rightIcon ? styles.inputWithRight : undefined, style]}
           placeholderTextColor={Colors.muted}
           onFocus={(e) => {
             setFocused(true);

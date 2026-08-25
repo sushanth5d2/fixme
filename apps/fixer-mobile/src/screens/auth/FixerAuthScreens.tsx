@@ -5,6 +5,7 @@ import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme
 import { useAuthStore } from '../../stores/auth.store';
 
 export function FixerLoginScreen({ navigation }: any) {
+  const [loginType, setLoginType] = useState<'owner' | 'member'>('owner');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,11 @@ export function FixerLoginScreen({ navigation }: any) {
       await login(email.trim().toLowerCase(), password);
     } catch (err: any) {
       console.error('[Fixer Login Error]', err?.response?.data || err);
-      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Invalid credentials';
+      const msg =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Invalid credentials';
       Alert.alert('Login Failed', msg);
     } finally {
       setLoading(false);
@@ -28,21 +33,74 @@ export function FixerLoginScreen({ navigation }: any) {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.logo}>🔧</Text>
+          <Text style={styles.logo}>{loginType === 'owner' ? '🏢' : '🔧'}</Text>
           <Text style={styles.title}>Fix Me Pro</Text>
-          <Text style={styles.subtitle}>Sign in to your fixer account</Text>
+          <Text style={styles.subtitle}>
+            {loginType === 'owner'
+              ? 'Sign in as Workshop Owner'
+              : 'Sign in as Staff Technician'}
+          </Text>
         </View>
 
-        <Input label="Email" placeholder="you@company.com" value={email} onChangeText={setEmail}
-          keyboardType="email-address" autoCapitalize="none" />
-        <PasswordInput label="Password" placeholder="Enter your password" value={password} onChangeText={setPassword} />
-
-        <Button title="Sign In" onPress={handleLogin} loading={loading} size="lg" />
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>New to Fix Me?</Text>
-          <Button title="Register as Fixer" onPress={() => navigation.navigate('Signup')} variant="outline" size="md" />
+        {/* Login Type Selector */}
+        <View style={styles.loginTypeRow}>
+          <TouchableOpacity
+            style={[styles.loginTypeBtn, loginType === 'owner' && styles.loginTypeBtnActive]}
+            onPress={() => setLoginType('owner')}
+          >
+            <Text style={[styles.loginTypeText, loginType === 'owner' && styles.loginTypeTextActive]}>
+              🏢 Shop Owner
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.loginTypeBtn, loginType === 'member' && styles.loginTypeBtnActive]}
+            onPress={() => setLoginType('member')}
+          >
+            <Text style={[styles.loginTypeText, loginType === 'member' && styles.loginTypeTextActive]}>
+              🔧 Staff Member
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        <Input
+          label={loginType === 'owner' ? 'Owner Email' : 'Staff Login Email'}
+          placeholder={loginType === 'owner' ? 'owner@company.com' : 'technician@workshop.com'}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <PasswordInput
+          label="Password"
+          placeholder="Enter your password"
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        <Button
+          title={loginType === 'owner' ? 'Sign In as Owner' : 'Sign In as Staff Member'}
+          onPress={handleLogin}
+          loading={loading}
+          size="lg"
+        />
+
+        {loginType === 'owner' ? (
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>New to Fix Me?</Text>
+            <Button
+              title="Register New Workshop"
+              onPress={() => navigation.navigate('Signup')}
+              variant="outline"
+              size="md"
+            />
+          </View>
+        ) : (
+          <View style={styles.memberHelpBox}>
+            <Text style={styles.memberHelpText}>
+              💡 Staff credentials are created by your workshop business owner.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -180,5 +238,47 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     textAlign: 'center',
     fontWeight: FontWeight.semibold,
+  },
+  loginTypeRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: BorderRadius.lg,
+    padding: 4,
+    marginBottom: Spacing.md,
+  },
+  loginTypeBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderRadius: BorderRadius.md,
+  },
+  loginTypeBtnActive: {
+    backgroundColor: Colors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  loginTypeText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+    color: Colors.muted,
+  },
+  loginTypeTextActive: {
+    color: Colors.text,
+    fontWeight: FontWeight.bold,
+  },
+  memberHelpBox: {
+    backgroundColor: '#F3F4F6',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.lg,
+  },
+  memberHelpText: {
+    fontSize: FontSize.xs,
+    color: Colors.muted,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

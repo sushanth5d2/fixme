@@ -324,19 +324,32 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.quoteActionBtn, myQuote && styles.quoteActionBtnEdit]}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('SubmitQuote', {
-            requestId: request.id,
-            categoryName: request.category?.name,
-            existingQuote: myQuote,
-          })}
-        >
-          <Text style={styles.quoteActionText}>
-            {myQuote ? 'Edit Quote ✏️' : 'Send Quote 💼'}
-          </Text>
-        </TouchableOpacity>
+        {myQuote?.status === 'ACCEPTED' ? (
+          <TouchableOpacity
+            style={[styles.quoteActionBtn, { backgroundColor: Colors.primary }]}
+            activeOpacity={0.8}
+            onPress={() => {
+              // Navigate to jobs
+              navigation.navigate('MyJobsTab');
+            }}
+          >
+            <Text style={styles.quoteActionText}>Manage Job 🔧</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.quoteActionBtn, myQuote && styles.quoteActionBtnEdit]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('SubmitQuote', {
+              requestId: request.id,
+              categoryName: request.category?.name,
+              existingQuote: myQuote,
+            })}
+          >
+            <Text style={styles.quoteActionText}>
+              {myQuote ? 'Edit Quote ✏️' : 'Send Quote 💼'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

@@ -51,5 +51,6 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   ManageServices: undefined;
   ManageAreas: undefined;
+  ManageMembers: undefined;
   Registration: undefined;
 };

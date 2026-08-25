@@ -10,10 +10,11 @@ import {
   DeleteDateColumn,
   Index,
 } from 'typeorm';
-import { JobStatus } from '@fixme/shared-types';
+import { JobStatus, QuoteRevisionStatus } from '@fixme/shared-types';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { QuoteEntity } from '../quotes/quote.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
+import { FixerMemberEntity } from '../fixers/fixer-member.entity';
 import { CustomerEntity } from '../customers/customer.entity';
 import { JobStatusHistoryEntity } from './job-status-history.entity';
 
@@ -52,6 +53,28 @@ export class JobEntity {
   @Index()
   @Column({ name: 'customer_id', type: 'uuid' })
   customerId!: string;
+
+  @ManyToOne(() => FixerMemberEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'assigned_member_id' })
+  assignedMember!: FixerMemberEntity | null;
+
+  @Index()
+  @Column({ name: 'assigned_member_id', type: 'uuid', nullable: true })
+  assignedMemberId!: string | null;
+
+  @Column({
+    name: 'revision_status',
+    type: 'enum',
+    enum: QuoteRevisionStatus,
+    default: QuoteRevisionStatus.NONE,
+  })
+  revisionStatus!: QuoteRevisionStatus;
+
+  @Column({ name: 'revised_total', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  revisedTotal!: number | null;
+
+  @Column({ name: 'revision_notes', type: 'text', nullable: true })
+  revisionNotes!: string | null;
 
   @Column({
     type: 'enum',

@@ -24,7 +24,9 @@ import { FixerMainProfileScreen } from '../screens/profile/FixerMainProfileScree
 import { FixerEditProfileScreen } from '../screens/profile/FixerEditProfileScreen';
 import { FixerManageServicesScreen } from '../screens/profile/FixerManageServicesScreen';
 import { FixerManageAreasScreen } from '../screens/profile/FixerManageAreasScreen';
+import { FixerManageMembersScreen } from '../screens/profile/FixerManageMembersScreen';
 import { FixerRegistrationScreen } from '../screens/profile/FixerRegistrationScreen';
+import { useAuthStore } from '../stores/auth.store';
 import { Colors, FontSize, FontWeight } from '../theme/tokens';
 
 // ── Feed Stack ──
@@ -115,7 +117,8 @@ function ProfileNavigator() {
   return (
     <ProfileStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <ProfileStack.Screen name="Profile" component={FixerMainProfileScreen} options={{ headerShown: false }} />
-      <ProfileStack.Screen name="EditProfile" component={FixerEditProfileScreen} options={{ title: 'Edit Business Profile' }} />
+      <ProfileStack.Screen name="EditProfile" component={FixerEditProfileScreen} options={{ title: 'Edit Profile' }} />
+      <ProfileStack.Screen name="ManageMembers" component={FixerManageMembersScreen} options={{ title: 'Team & Technicians' }} />
       <ProfileStack.Screen name="ManageServices" component={FixerManageServicesScreen} options={{ title: 'Repair Specialties' }} />
       <ProfileStack.Screen name="ManageAreas" component={FixerManageAreasScreen} options={{ title: 'Service Coverage' }} />
       <ProfileStack.Screen name="Registration" component={FixerRegistrationScreen} options={{ title: 'Business Details & KYC' }} />
@@ -136,6 +139,9 @@ const TAB_ICONS: Record<string, string> = {
 };
 
 export function MainTabNavigator() {
+  const { user } = useAuthStore();
+  const isMember = user?.role === 'FIXER_MEMBER';
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -147,10 +153,20 @@ export function MainTabNavigator() {
         tabBarStyle: styles.tabBar,
       })}
     >
-      <Tab.Screen name="FeedTab" component={FeedNavigator} options={{ tabBarLabel: 'Feed' }} />
-      <Tab.Screen name="MapTab" component={MapNavigator} options={{ tabBarLabel: 'Map' }} />
-      <Tab.Screen name="MyJobsTab" component={JobsNavigator} options={{ tabBarLabel: 'My Jobs' }} />
-      <Tab.Screen name="MyQuotesTab" component={QuotesNavigator} options={{ tabBarLabel: 'Quotes' }} />
+      {!isMember && (
+        <Tab.Screen name="FeedTab" component={FeedNavigator} options={{ tabBarLabel: 'Feed' }} />
+      )}
+      {!isMember && (
+        <Tab.Screen name="MapTab" component={MapNavigator} options={{ tabBarLabel: 'Map' }} />
+      )}
+      <Tab.Screen
+        name="MyJobsTab"
+        component={JobsNavigator}
+        options={{ tabBarLabel: isMember ? 'Assigned Jobs' : 'My Jobs' }}
+      />
+      {!isMember && (
+        <Tab.Screen name="MyQuotesTab" component={QuotesNavigator} options={{ tabBarLabel: 'Quotes' }} />
+      )}
       <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ tabBarLabel: 'Chat' }} />
       <Tab.Screen name="ProfileTab" component={ProfileNavigator} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>

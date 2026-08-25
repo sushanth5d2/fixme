@@ -8,9 +8,10 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Button } from '../../components/ui';
+import { Button, Input } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { useAuthStore } from '../../stores/auth.store';
 import { api } from '../../services/api';
@@ -31,26 +32,43 @@ interface FixerData {
   city?: string;
   state?: string;
   pincode?: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  fixer?: any;
 }
 
 export function FixerMainProfileScreen({ navigation }: any) {
   const { user, logout } = useAuthStore();
+  const isMember = user?.role === 'FIXER_MEMBER';
   const [profile, setProfile] = useState<FixerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Change Password for Staff
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
   const fetchProfile = useCallback(async () => {
     try {
-      const { data } = await api.get('/fixers/me');
-      const p = data?.data?.profile || data?.data;
-      if (p) setProfile(p);
+      if (isMember) {
+        const { data } = await api.get('/fixers/me/member-profile');
+        const p = data?.data || data;
+        if (p) setProfile(p);
+      } else {
+        const { data } = await api.get('/fixers/me');
+        const p = data?.data?.profile || data?.data;
+        if (p) setProfile(p);
+      }
     } catch (err) {
       console.error('[Fetch Fixer Profile Error]', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isMember]);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,6 +83,25 @@ export function FixerMainProfileScreen({ navigation }: any) {
     ]);
   };
 
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      Alert.alert('Invalid Password', 'Please enter your current password and a new password (min 6 characters).');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await api.post('/auth/password/change', { currentPassword, newPassword });
+      Alert.alert('Password Changed! 🎉', 'Your login password has been updated.');
+      setPasswordModalVisible(false);
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to change password');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const isVerified = profile?.verificationStatus === 'VERIFIED';
 
   if (loading && !profile) {
@@ -75,12 +112,18 @@ export function FixerMainProfileScreen({ navigation }: any) {
     );
   }
 
-  const menuItems = [
+  const ownerMenuItems = [
     {
       icon: '🏢',
       title: 'Edit Business Profile',
-      subtitle: 'Company name, owner name, experience & bio',
+      subtitle: 'Company name, owner name, experience & address',
       onPress: () => navigation.navigate('EditProfile'),
+    },
+    {
+      icon: '👥',
+      title: 'Team & Technicians',
+      subtitle: 'Add shop staff, set passwords & assign repairs',
+      onPress: () => navigation.navigate('ManageMembers'),
     },
     {
       icon: '🛠️',
@@ -102,6 +145,25 @@ export function FixerMainProfileScreen({ navigation }: any) {
     },
   ];
 
+  const memberMenuItems = [
+    {
+      icon: '🔑',
+      title: 'Change Password',
+      subtitle: 'Update your staff login password',
+      onPress: () => setPasswordModalVisible(true),
+    },
+  ];
+
+  const menuItems = isMember ? memberMenuItems : ownerMenuItems;
+
+  const displayName = isMember
+    ? profile?.fullName || (user as any)?.fullName || 'Technician'
+    : profile?.companyName || 'Technician Business';
+
+  const subName = isMember
+    ? `Workshop: ${profile?.fixer?.companyName || 'Fix Me Service'}`
+    : `Proprietor: ${profile?.ownerName || 'Verified Fixer'}`;
+
   return (
     <ScrollView
       style={styles.container}
@@ -112,17 +174,17 @@ export function FixerMainProfileScreen({ navigation }: any) {
       <View style={styles.header}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {profile?.companyName?.charAt(0).toUpperCase() || profile?.ownerName?.charAt(0).toUpperCase() || '🔧'}
+            {displayName.charAt(0).toUpperCase() || '🔧'}
           </Text>
         </View>
 
-        <Text style={styles.companyName}>{profile?.companyName || 'Technician Business'}</Text>
-        <Text style={styles.ownerName}>Proprietor: {profile?.ownerName || 'Verified Fixer'}</Text>
+        <Text style={styles.companyName}>{displayName}</Text>
+        <Text style={styles.ownerName}>{subName}</Text>
 
         <View style={styles.badgeRow}>
-          <View style={[styles.statusBadge, { backgroundColor: isVerified ? '#DCFCE7' : '#FEF3C7' }]}>
-            <Text style={[styles.statusBadgeText, { color: isVerified ? '#16A34A' : '#D97706' }]}>
-              {isVerified ? '✅ VERIFIED PRO' : '⏳ PENDING REVIEW'}
+          <View style={[styles.statusBadge, { backgroundColor: isMember ? '#EDE9FE' : isVerified ? '#DCFCE7' : '#FEF3C7' }]}>
+            <Text style={[styles.statusBadgeText, { color: isMember ? '#7C3AED' : isVerified ? '#16A34A' : '#D97706' }]}>
+              {isMember ? '🔧 STAFF TECHNICIAN' : isVerified ? '✅ VERIFIED PRO' : '⏳ PENDING REVIEW'}
             </Text>
           </View>
 
@@ -133,34 +195,40 @@ export function FixerMainProfileScreen({ navigation }: any) {
           ) : null}
         </View>
 
-        <Text style={styles.contactText}>📧 {user?.email || ''} · 📱 {user?.phone || profile?.pincode || ''}</Text>
-      </View>
-
-      {/* Stats Row */}
-      <View style={styles.statsCard}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>⭐ {Number(profile?.averageRating || 5.0).toFixed(1)}</Text>
-          <Text style={styles.statLabel}>{profile?.totalReviews || 0} Reviews</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>🔧 {profile?.completedJobs || 0}</Text>
-          <Text style={styles.statLabel}>Completed Jobs</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>📅 {profile?.experienceYears || 1}+ yrs</Text>
-          <Text style={styles.statLabel}>Experience</Text>
-        </View>
-      </View>
-
-      {/* Location Banner */}
-      <View style={styles.locationCard}>
-        <Text style={styles.locationTitle}>📍 Primary Workshop Location</Text>
-        <Text style={styles.locationAddress}>
-          {profile?.addressLine || 'Shop 1, Main Road'}, {profile?.city || 'Bengaluru'}, {profile?.state || 'Karnataka'} - {profile?.pincode || '560001'}
+        <Text style={styles.contactText}>
+          📧 {profile?.email || user?.email || ''} · 📱 {profile?.phone || (user as any)?.phone || profile?.pincode || ''}
         </Text>
       </View>
+
+      {/* Stats Row for Owner */}
+      {!isMember && (
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>⭐ {Number(profile?.averageRating || 5.0).toFixed(1)}</Text>
+            <Text style={styles.statLabel}>{profile?.totalReviews || 0} Reviews</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>🔧 {profile?.completedJobs || 0}</Text>
+            <Text style={styles.statLabel}>Completed Jobs</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>📅 {profile?.experienceYears || 1}+ yrs</Text>
+            <Text style={styles.statLabel}>Experience</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Location Banner */}
+      {!isMember && (
+        <View style={styles.locationCard}>
+          <Text style={styles.locationTitle}>📍 Primary Workshop Location</Text>
+          <Text style={styles.locationAddress}>
+            {profile?.addressLine || 'Shop 1, Main Road'}, {profile?.city || 'Bengaluru'}, {profile?.state || 'Karnataka'} - {profile?.pincode || '560001'}
+          </Text>
+        </View>
+      )}
 
       {/* Navigation Menu */}
       <View style={styles.menuContainer}>
@@ -191,6 +259,56 @@ export function FixerMainProfileScreen({ navigation }: any) {
         />
         <Text style={styles.versionText}>Fix Me Pro Technician App v1.0.0</Text>
       </View>
+
+      {/* Change Password Modal */}
+      <Modal
+        visible={passwordModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.popupCard}>
+            <Text style={styles.popupTitle}>🔑 Change Password</Text>
+            <Text style={styles.popupSubtitle}>Enter your current and new password:</Text>
+
+            <Input
+              label="Current Password"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+            />
+
+            <Input
+              label="New Password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="Minimum 6 characters"
+              secureTextEntry
+            />
+
+            <View style={styles.popupActions}>
+              <TouchableOpacity
+                style={styles.popupCancelBtn}
+                onPress={() => setPasswordModalVisible(false)}
+              >
+                <Text style={styles.popupCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.popupSaveBtn}
+                onPress={handleChangePassword}
+                disabled={savingPassword}
+              >
+                {savingPassword ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.popupSaveText}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -295,4 +413,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   versionText: { fontSize: FontSize.xs, color: Colors.muted },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.base },
+  popupCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    gap: Spacing.sm,
+  },
+  popupTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  popupSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginBottom: Spacing.xs },
+  popupActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm, marginTop: Spacing.sm },
+  popupCancelBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  popupCancelText: { fontSize: FontSize.sm, color: Colors.muted, fontWeight: FontWeight.semibold },
+  popupSaveBtn: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  popupSaveText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 });

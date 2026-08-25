@@ -15,6 +15,7 @@ import { UserEntity } from '../users/user.entity';
 import { FixerDocumentEntity } from './fixer-document.entity';
 import { FixerServiceEntity } from './fixer-service.entity';
 import { FixerServiceAreaEntity } from './fixer-service-area.entity';
+import { FixerMemberEntity } from './fixer-member.entity';
 
 @Entity('fixers')
 export class FixerEntity {
@@ -112,6 +113,9 @@ export class FixerEntity {
 
   @OneToMany(() => FixerServiceAreaEntity, (a) => a.fixer)
   serviceAreas!: FixerServiceAreaEntity[];
+
+  @OneToMany(() => FixerMemberEntity, (m) => m.fixer)
+  members!: FixerMemberEntity[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

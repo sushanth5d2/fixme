@@ -71,7 +71,11 @@ export class QuotesService {
         this.logger.log(`Quote ${updated.id} updated by fixer ${fixer.id} for request ${dto.requestId}`);
         return updated;
       }
-      throw new ConflictException('You have already submitted a quote for this request that was accepted or rejected');
+      throw new ConflictException(
+        existingQuote.status === QuoteStatus.ACCEPTED
+          ? 'This quote has already been accepted by the customer. To change price or diagnosis, submit a Quote Revision Request from Manage Job.'
+          : 'You have already submitted a quote for this request that cannot be directly edited.',
+      );
     }
 
     const quote = new QuoteEntity();

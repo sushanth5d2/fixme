@@ -123,6 +123,64 @@ export class FixersController {
     return this.fixersService.removeServiceArea(userId, areaId);
   }
 
+  // ── Fixer Team Members / Staff ──────────────────────────────
+
+  @Post('me/members')
+  @Roles(UserRole.FIXER)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Add a new team member / technician' })
+  public createMember(
+    @CurrentUser('sub') userId: string,
+    @Body()
+    dto: {
+      fullName: string;
+      email: string;
+      phone: string;
+      password: string;
+      profilePhotoKey?: string;
+    },
+  ) {
+    return this.fixersService.createMember(userId, dto);
+  }
+
+  @Get('me/members')
+  @Roles(UserRole.FIXER)
+  @ApiOperation({ summary: 'List all team members / technicians' })
+  public getMembers(@CurrentUser('sub') userId: string) {
+    return this.fixersService.getMembers(userId);
+  }
+
+  @Delete('me/members/:memberId')
+  @Roles(UserRole.FIXER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove a team member' })
+  @ApiParam({ name: 'memberId', type: 'string', format: 'uuid' })
+  public deleteMember(
+    @CurrentUser('sub') userId: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+  ) {
+    return this.fixersService.deleteMember(userId, memberId);
+  }
+
+  @Patch('me/members/:memberId/password')
+  @Roles(UserRole.FIXER)
+  @ApiOperation({ summary: 'Reset or change password for a team member' })
+  @ApiParam({ name: 'memberId', type: 'string', format: 'uuid' })
+  public resetMemberPassword(
+    @CurrentUser('sub') userId: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+    @Body() dto: { password: string },
+  ) {
+    return this.fixersService.resetMemberPassword(userId, memberId, dto.password);
+  }
+
+  @Get('me/member-profile')
+  @Roles(UserRole.FIXER_MEMBER, UserRole.FIXER)
+  @ApiOperation({ summary: 'Get current logged-in staff member profile' })
+  public getMyMemberProfile(@CurrentUser('sub') userId: string) {
+    return this.fixersService.getMyMemberProfile(userId);
+  }
+
   // ── Public Endpoints ───────────────────────────────────────
 
   @Get('search')
