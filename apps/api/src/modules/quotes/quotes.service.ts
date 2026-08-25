@@ -156,7 +156,7 @@ export class QuotesService {
     return this.quoteRepo.find({
       where: { requestId },
       relations: ['fixer'],
-      order: { amount: 'ASC', createdAt: 'ASC' },
+      order: { estimatedTotal: 'ASC', createdAt: 'ASC' },
     });
   }
 
