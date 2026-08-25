@@ -8,11 +8,12 @@ import {
   Index,
   Unique,
 } from 'typeorm';
+import { UserRole } from '@fixme/shared-types';
 import { ConversationEntity } from './conversation.entity';
 import { UserEntity } from '../users/user.entity';
 
 @Entity('conversation_members')
-@Unique('conversation_members_unique', ['conversationId', 'userId'])
+@Unique('conv_members_unique', ['conversationId', 'userId'])
 export class ConversationMemberEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -33,9 +34,9 @@ export class ConversationMemberEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
-  @Column({ name: 'last_read_at', type: 'timestamptz', nullable: true })
-  lastReadAt!: Date | null;
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.CUSTOMER })
+  role!: UserRole;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
-  createdAt!: Date;
+  @CreateDateColumn({ name: 'joined_at', type: 'timestamptz' })
+  joinedAt!: Date;
 }

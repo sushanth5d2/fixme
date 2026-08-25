@@ -6,6 +6,7 @@ import {
   JoinColumn,
   OneToMany,
   CreateDateColumn,
+  UpdateDateColumn,
   Index,
 } from 'typeorm';
 import { ConversationEntity } from './conversation.entity';
@@ -32,15 +33,21 @@ export class MessageEntity {
   @Column({ name: 'sender_id', type: 'uuid' })
   senderId!: string;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: true })
   content!: string;
 
-  @Column({ name: 'is_system_message', type: 'boolean', default: false })
-  isSystemMessage!: boolean;
+  @Column({ name: 'is_read', type: 'boolean', default: false })
+  isRead!: boolean;
+
+  @Column({ name: 'read_at', type: 'timestamptz', nullable: true })
+  readAt!: Date | null;
 
   @OneToMany(() => MessageAttachmentEntity, (a) => a.message)
   attachments!: MessageAttachmentEntity[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt!: Date;
 }

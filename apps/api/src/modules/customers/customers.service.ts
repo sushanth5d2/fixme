@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, IsNull } from 'typeorm';
 import { CustomerEntity } from './customer.entity';
 import { AddressEntity } from './address.entity';
 import { UserEntity } from '../users/user.entity';
@@ -172,13 +172,22 @@ export class CustomersService {
     const customer = await this.findCustomerOrFail(userId);
     const address = await this.findAddressOrFail(addressId, customer.id);
 
-    if (address.isDefault) {
-      throw new BadRequestException(
-        'Cannot delete the default address. Please set another address as default first.',
-      );
-    }
+    await this.dataSource.transaction(async (manager) => {
+      await manager.softDelete(AddressEntity, addressId);
 
-    await this.addressRepo.softDelete(addressId);
+      // If the deleted address was default, promote the newest remaining address if one exists
+      if (address.isDefault) {
+        const nextAddress = await manager.findOne(AddressEntity, {
+          where: { customerId: customer.id, deletedAt: IsNull() },
+          order: { createdAt: 'DESC' },
+        });
+        if (nextAddress) {
+          nextAddress.isDefault = true;
+          await manager.save(nextAddress);
+        }
+      }
+    });
+
     this.logger.log(`Address deleted: ${addressId} by customer: ${userId}`);
     return { message: 'Address deleted successfully' };
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 import { HomeStackParamList } from '../../navigation/types';
@@ -73,7 +74,7 @@ export function HomeScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [catRes, reqRes] = await Promise.all([
         api.get('/categories').catch(() => null),
@@ -96,7 +97,13 @@ export function HomeScreen({ navigation }: Props) {
         setCategories(uniqueCats);
       }
       if (reqRes?.data?.data) {
-        setRecentRequests(reqRes.data.data);
+        const rawReqs = reqRes.data.data;
+        const reqList: RecentRequest[] = Array.isArray(rawReqs?.data)
+          ? rawReqs.data
+          : Array.isArray(rawReqs)
+          ? rawReqs
+          : [];
+        setRecentRequests(reqList);
       }
     } catch {
       // Retain fallback categories
@@ -104,9 +111,13 @@ export function HomeScreen({ navigation }: Props) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData]),
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

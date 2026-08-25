@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { UserRole } from '@fixme/shared-types';
 import { ConversationEntity } from './conversation.entity';
 import { ConversationMemberEntity } from './conversation-member.entity';
 import { MessageEntity } from './message.entity';
@@ -66,10 +67,12 @@ export class ChatService {
       const customerMember = manager.create(ConversationMemberEntity, {
         conversationId: saved.id,
         userId: job.customer.userId,
+        role: UserRole.CUSTOMER,
       });
       const fixerMember = manager.create(ConversationMemberEntity, {
         conversationId: saved.id,
         userId: job.fixer.userId,
+        role: UserRole.FIXER,
       });
       await manager.save([customerMember, fixerMember]);
 
@@ -145,7 +148,13 @@ export class ChatService {
     });
 
     // Mark as read
-    await this.memberRepo.update(member.id, { lastReadAt: new Date() });
+    try {
+      await this.messageRepo.createQueryBuilder()
+        .update(MessageEntity)
+        .set({ isRead: true, readAt: new Date() })
+        .where('conversationId = :conversationId AND senderId != :userId', { conversationId, userId })
+        .execute();
+    } catch {}
 
     return { data, total };
   }
@@ -157,7 +166,7 @@ export class ChatService {
       where: { userId },
       relations: ['conversation', 'conversation.members', 'conversation.members.user'],
     });
-    return members.map((m) => m.conversation);
+    return members.map((m) => m.conversation).filter(Boolean);
   }
 
   public async markAsRead(
@@ -168,7 +177,13 @@ export class ChatService {
       where: { conversationId, userId },
     });
     if (!member) throw new ForbiddenException('Not a member');
-    await this.memberRepo.update(member.id, { lastReadAt: new Date() });
+    try {
+      await this.messageRepo.createQueryBuilder()
+        .update(MessageEntity)
+        .set({ isRead: true, readAt: new Date() })
+        .where('conversationId = :conversationId AND senderId != :userId', { conversationId, userId })
+        .execute();
+    } catch {}
     return { message: 'Marked as read' };
   }
 }

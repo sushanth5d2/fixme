@@ -52,10 +52,20 @@ export function RequestsListScreen({ navigation }: any) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  const [totalCount, setTotalCount] = useState(0);
+
   const fetchRequests = useCallback(async (p = 1, refresh = false) => {
     try {
       const { data } = await api.get(`/repair-requests/mine?page=${p}&limit=15`);
-      const items = data.data || [];
+      const raw = data?.data;
+      const items: RepairRequest[] = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw)
+        ? raw
+        : [];
+      const total = typeof raw?.total === 'number' ? raw.total : items.length;
+      setTotalCount(total);
+
       if (refresh) {
         setRequests(items);
       } else {
@@ -140,7 +150,7 @@ export function RequestsListScreen({ navigation }: any) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Requests</Text>
-        <Text style={styles.count}>{requests.length} total</Text>
+        <Text style={styles.count}>{totalCount || requests.length} total</Text>
       </View>
       <FlatList
         data={requests}
