@@ -27,7 +27,7 @@ export class RepairRequestMediaEntity {
   @Column({ type: 'enum', enum: MediaType, default: MediaType.PHOTO })
   type!: MediaType;
 
-  @Column({ name: 'storage_key', type: 'varchar', length: 512 })
+  @Column({ name: 'storage_key', type: 'text' })
   storageKey!: string;
 
   @Column({ name: 'original_filename', type: 'varchar', length: 500, nullable: true })

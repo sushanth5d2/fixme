@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -32,7 +33,7 @@ const FIXER_VISIBLE_STATUSES = [
 ];
 
 @Injectable()
-export class RepairRequestsService {
+export class RepairRequestsService implements OnModuleInit {
   private readonly logger = new Logger(RepairRequestsService.name);
 
   constructor(
@@ -56,6 +57,17 @@ export class RepairRequestsService {
 
     private readonly dataSource: DataSource,
   ) {}
+
+  public async onModuleInit() {
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE problem_request_media ALTER COLUMN storage_key TYPE TEXT;
+      `);
+      this.logger.log('Upgraded problem_request_media.storage_key column to TEXT');
+    } catch (err: any) {
+      this.logger.warn(`Could not alter storage_key column: ${err?.message}`);
+    }
+  }
 
   // ── Create ─────────────────────────────────────────────────
 

@@ -105,12 +105,15 @@ export function CreateRequestScreen({ route, navigation }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: false,
-      quality: 0.7,
+      quality: 0.5,
       base64: true,
     });
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      const uri = result.assets[0].uri;
-      setPhotos((prev) => [...prev, uri]);
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const photoUri = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : asset.uri;
+      setPhotos((prev) => [...prev, photoUri]);
     }
   };
 
@@ -125,12 +128,15 @@ export function CreateRequestScreen({ route, navigation }: Props) {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      quality: 0.7,
+      quality: 0.5,
       base64: true,
     });
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      const uri = result.assets[0].uri;
-      setPhotos((prev) => [...prev, uri]);
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const photoUri = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : asset.uri;
+      setPhotos((prev) => [...prev, photoUri]);
     }
   };
 

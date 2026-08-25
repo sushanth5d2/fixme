@@ -9,6 +9,8 @@ import {
   Alert,
   Linking,
   Image,
+  Modal,
+  SafeAreaView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Button } from '../../components/ui';
@@ -58,6 +60,7 @@ export function RequestDetailScreen({ route, navigation }: any) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -94,12 +97,7 @@ export function RequestDetailScreen({ route, navigation }: any) {
               await api.patch(`/quotes/${quoteId}/accept`, {});
               Alert.alert('Quote Accepted!', 'The fixer has been assigned to your job.');
               // Refresh
-              const [reqRes, quotesRes] = await Promise.all([
-                api.get(`/repair-requests/mine/${requestId}`),
-                api.get(`/quotes/request/${requestId}`),
-              ]);
-              setRequest(reqRes.data.data || reqRes.data);
-              setQuotes(quotesRes.data.data || quotesRes.data || []);
+              fetchDetail();
             } catch (err: any) {
               Alert.alert('Error', err?.response?.data?.message || 'Failed to accept quote');
             } finally {
@@ -157,185 +155,258 @@ export function RequestDetailScreen({ route, navigation }: any) {
   ].filter(Boolean).join(', ') || (request.address ? `${request.address.houseBuilding}, ${request.address.area}, ${request.address.city} - ${request.address.pincode}` : 'Address not specified');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Status Header */}
-      <View style={styles.statusHeader}>
-        <Text style={styles.statusLabel}>{request.status.replace(/_/g, ' ')}</Text>
-        <Text style={styles.date}>
-          Created {new Date(request.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-        </Text>
-      </View>
+    <View style={styles.flex}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Status Header */}
+        <View style={styles.statusHeader}>
+          <Text style={styles.statusLabel}>{request.status.replace(/_/g, ' ')}</Text>
+          <Text style={styles.date}>
+            Created {new Date(request.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </Text>
+        </View>
 
-      {/* Device Info */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Device</Text>
-        <Text style={styles.category}>{request.category?.name}{request.brand ? ` · ${request.brand.name}` : ''}</Text>
-        {request.deviceModel && <Text style={styles.model}>{request.deviceModel}</Text>}
-      </View>
-
-      {/* Description */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Problem Description</Text>
-        <Text style={styles.description}>{desc}</Text>
-      </View>
-
-      {/* Media Photos if attached */}
-      {Array.isArray(request.media) && request.media.length > 0 && (
+        {/* Device Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Attached Photos</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
-            {request.media.map((m) => (
-              <Image key={m.id} source={{ uri: m.storageKey }} style={styles.photoThumb} />
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Location & Map Card */}
-      <View style={styles.mapCard}>
-        <View style={styles.mapHeaderRow}>
-          <Text style={styles.mapCardTitle}>📍 Service Location & Map</Text>
-          <TouchableOpacity style={styles.openMapBtn} onPress={openMap}>
-            <Text style={styles.openMapBtnText}>Open in Google Maps 🗺️</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Device</Text>
+          <Text style={styles.category}>{request.category?.name}{request.brand ? ` · ${request.brand.name}` : ''}</Text>
+          {request.deviceModel && <Text style={styles.model}>{request.deviceModel}</Text>}
         </View>
 
-        <Text style={styles.addressText}>{fullAddress}</Text>
+        {/* Description */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Problem Description</Text>
+          <Text style={styles.description}>{desc}</Text>
+        </View>
 
-        {request.latitude && request.longitude ? (
-          <View style={styles.mapBox}>
-            <Text style={styles.mapPinIcon}>📌</Text>
-            <Text style={styles.mapCoordinates}>
-              GPS: {Number(request.latitude).toFixed(4)}, {Number(request.longitude).toFixed(4)}
-            </Text>
-            <Text style={styles.tapToView}>Tap "Open in Google Maps" for live navigation</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Quotes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Quotes from Fixers ({quotes.length})
-        </Text>
-        {quotes.length === 0 ? (
-          <View style={styles.noQuotes}>
-            <Text style={styles.noQuotesText}>Waiting for verified fixers to send quotes...</Text>
-          </View>
-        ) : (
-          quotes.map((q) => {
-            const amountVal = Number(q.estimatedTotal ?? q.amount ?? 0);
-            const notesText = q.notes || q.diagnosisNotes;
-            const fixerId = q.fixer?.id || q.fixerId;
-
-            return (
-              <View key={q.id} style={styles.quoteCard}>
+        {/* Media Photos if attached */}
+        {Array.isArray(request.media) && request.media.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📸 Attached Photos ({request.media.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
+              {request.media.map((m, idx) => (
                 <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={styles.quoteFixerHeader}
-                  onPress={() => {
-                    if (fixerId) {
-                      navigation.navigate('FixerProfile', { fixerId });
-                    }
-                  }}
+                  key={m.id || idx}
+                  activeOpacity={0.8}
+                  onPress={() => setSelectedPhoto(m.storageKey)}
+                  style={styles.photoThumbWrapper}
                 >
-                  <View style={styles.fixerInfo}>
-                    <View style={styles.fixerNameRow}>
-                      <Text style={styles.fixerName}>{q.fixer?.companyName || q.fixer?.ownerName || 'Verified Fixer'}</Text>
-                      <Text style={styles.viewProfileTag}>View Profile 🔍</Text>
-                    </View>
-                    <View style={styles.fixerStats}>
-                      <Text style={styles.fixerStat}>★ {Number(q.fixer?.averageRating || 0).toFixed(1)}</Text>
-                      <Text style={styles.fixerStat}>{q.fixer?.completedJobs || 0} jobs</Text>
-                      {q.warrantyDays > 0 && <Text style={styles.fixerStat}>{q.warrantyDays}d warranty</Text>}
-                      {q.estimatedDurationHours && <Text style={styles.fixerStat}>{q.estimatedDurationHours}h est.</Text>}
-                    </View>
+                  <Image
+                    source={{ uri: m.storageKey }}
+                    style={styles.photoThumb}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.zoomBadge}>
+                    <Text style={styles.zoomText}>🔍 View</Text>
                   </View>
-                  <Text style={styles.quoteAmount}>₹{amountVal.toLocaleString('en-IN')}</Text>
                 </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
-                {notesText ? <Text style={styles.diagnosis}>{notesText}</Text> : null}
+        {/* Location & Map Card */}
+        <View style={styles.mapCard}>
+          <View style={styles.mapHeaderRow}>
+            <Text style={styles.mapCardTitle}>📍 Service Location & Map</Text>
+            <TouchableOpacity style={styles.openMapBtn} onPress={openMap}>
+              <Text style={styles.openMapBtnText}>Open in Google Maps 🗺️</Text>
+            </TouchableOpacity>
+          </View>
 
-                <View style={styles.quoteActions}>
+          <Text style={styles.addressText}>{fullAddress}</Text>
+
+          {request.latitude && request.longitude ? (
+            <View style={styles.mapBox}>
+              <Text style={styles.mapPinIcon}>📌</Text>
+              <Text style={styles.mapCoordinates}>
+                GPS: {Number(request.latitude).toFixed(4)}, {Number(request.longitude).toFixed(4)}
+              </Text>
+              <Text style={styles.tapToView}>Tap "Open in Google Maps" for live navigation</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Quotes */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Quotes from Fixers ({quotes.length})
+          </Text>
+          {quotes.length === 0 ? (
+            <View style={styles.noQuotes}>
+              <Text style={styles.noQuotesText}>Waiting for verified fixers to send quotes...</Text>
+            </View>
+          ) : (
+            quotes.map((q) => {
+              const amountVal = Number(q.estimatedTotal ?? q.amount ?? 0);
+              const notesText = q.notes || q.diagnosisNotes;
+              const fixerId = q.fixer?.id || q.fixerId;
+
+              return (
+                <View key={q.id} style={styles.quoteCard}>
                   <TouchableOpacity
-                    style={styles.chatFixerBtn}
-                    onPress={async () => {
-                      try {
-                        const { data } = await api.post('/chat/conversations', { requestId: request.id });
-                        const conv = data?.data || data;
-                        if (conv?.id) {
-                          navigation.navigate('ChatRoom', {
-                            conversationId: conv.id,
-                            otherUserName: q.fixer?.companyName || 'Fixer',
-                          });
-                        }
-                      } catch (err: any) {
-                        Alert.alert('Error', err?.response?.data?.message || 'Failed to open chat');
+                    activeOpacity={0.7}
+                    style={styles.quoteFixerHeader}
+                    onPress={() => {
+                      if (fixerId) {
+                        navigation.navigate('FixerProfile', { fixerId });
                       }
                     }}
                   >
-                    <Text style={styles.chatFixerBtnText}>💬 Chat</Text>
+                    <View style={styles.fixerInfo}>
+                      <View style={styles.fixerNameRow}>
+                        <Text style={styles.fixerName}>{q.fixer?.companyName || q.fixer?.ownerName || 'Verified Fixer'}</Text>
+                        <Text style={styles.viewProfileTag}>View Profile 🔍</Text>
+                      </View>
+                      <View style={styles.fixerStats}>
+                        <Text style={styles.fixerStat}>★ {Number(q.fixer?.averageRating || 0).toFixed(1)}</Text>
+                        <Text style={styles.fixerStat}>{q.fixer?.completedJobs || 0} jobs</Text>
+                        {q.warrantyDays > 0 && <Text style={styles.fixerStat}>{q.warrantyDays}d warranty</Text>}
+                        {q.estimatedDurationHours && <Text style={styles.fixerStat}>{q.estimatedDurationHours}h est.</Text>}
+                      </View>
+                    </View>
+                    <Text style={styles.quoteAmount}>₹{amountVal.toLocaleString('en-IN')}</Text>
                   </TouchableOpacity>
 
-                  {q.status === 'SUBMITTED' || q.status === 'VIEWED' ? (
-                    <TouchableOpacity
-                      style={styles.acceptBtn}
-                      onPress={() => handleAcceptQuote(q.id, q.fixer?.companyName || 'Fixer', amountVal)}
-                      disabled={accepting === q.id}
-                    >
-                      {accepting === q.id ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={styles.acceptBtnText}>Accept Quote ✓</Text>
-                      )}
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={[styles.quoteBadge, { backgroundColor: q.status === 'ACCEPTED' ? Colors.successBg : Colors.errorBg }]}>
-                      <Text style={[styles.quoteBadgeText, { color: q.status === 'ACCEPTED' ? Colors.success : Colors.error }]}>
-                        {q.status}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            );
-          })
-        )}
-      </View>
+                  {notesText ? <Text style={styles.diagnosis}>{notesText}</Text> : null}
 
-      {/* Cancel Button */}
-      {canCancel && (
-        <Button title="Cancel Request" onPress={handleCancel} variant="danger" size="md" />
-      )}
-    </ScrollView>
+                  <View style={styles.quoteActions}>
+                    <TouchableOpacity
+                      style={styles.chatFixerBtn}
+                      onPress={async () => {
+                        try {
+                          const { data } = await api.post('/chat/conversations', { requestId: request.id });
+                          const conv = data?.data || data;
+                          if (conv?.id) {
+                            navigation.navigate('ChatRoom', {
+                              conversationId: conv.id,
+                              otherUserName: q.fixer?.companyName || 'Fixer',
+                            });
+                          }
+                        } catch (err: any) {
+                          Alert.alert('Error', err?.response?.data?.message || 'Failed to open chat');
+                        }
+                      }}
+                    >
+                      <Text style={styles.chatFixerBtnText}>💬 Chat</Text>
+                    </TouchableOpacity>
+
+                    {q.status === 'SUBMITTED' || q.status === 'VIEWED' ? (
+                      <TouchableOpacity
+                        style={styles.acceptBtn}
+                        onPress={() => handleAcceptQuote(q.id, q.fixer?.companyName || 'Fixer', amountVal)}
+                        disabled={accepting === q.id}
+                      >
+                        {accepting === q.id ? (
+                          <ActivityIndicator size="small" color={Colors.white} />
+                        ) : (
+                          <Text style={styles.acceptBtnText}>Accept Quote ✓</Text>
+                        )}
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[styles.quoteBadge, { backgroundColor: q.status === 'ACCEPTED' ? Colors.success + '20' : Colors.muted + '20' }]}>
+                        <Text style={[styles.quoteBadgeText, { color: q.status === 'ACCEPTED' ? Colors.success : Colors.muted }]}>
+                          {q.status === 'ACCEPTED' ? '✓ Accepted' : q.status}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* Cancel Button */}
+        {canCancel && (
+          <Button
+            title="Cancel Request"
+            variant="outline"
+            onPress={handleCancel}
+            style={styles.cancelBtn}
+          />
+        )}
+      </ScrollView>
+
+      {/* Full Screen Photo Viewer Modal */}
+      <Modal
+        visible={!!selectedPhoto}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Photo Preview</Text>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setSelectedPhoto(null)}
+            >
+              <Text style={styles.modalCloseText}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalImageContainer}>
+            {selectedPhoto ? (
+              <Image
+                source={{ uri: selectedPhoto }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+        </SafeAreaView>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  content: { padding: Spacing.xl, paddingBottom: Spacing.xxxl },
+  flex: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1 },
+  content: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   statusHeader: {
-    backgroundColor: Colors.card, borderRadius: BorderRadius.lg, padding: Spacing.base,
-    marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.borderLight, alignItems: 'center',
+    backgroundColor: Colors.white, borderRadius: BorderRadius.lg, padding: Spacing.base,
+    marginBottom: Spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.borderLight,
   },
   statusLabel: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.accent },
-  date: { fontSize: FontSize.xs, color: Colors.muted, marginTop: Spacing.xs },
+  date: { fontSize: FontSize.xs, color: Colors.muted },
 
-  section: { marginBottom: Spacing.lg },
-  sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: Spacing.sm },
-  category: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.accent },
-  model: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-  description: { fontSize: FontSize.base, color: Colors.textSecondary, lineHeight: 22 },
+  section: {
+    backgroundColor: Colors.white, borderRadius: BorderRadius.lg, padding: Spacing.base,
+    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight,
+  },
+  sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.xs },
+  category: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.text },
+  model: { fontSize: FontSize.sm, color: Colors.muted, marginTop: 2 },
+  description: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20 },
 
-  photoStrip: { flexDirection: 'row', marginTop: Spacing.xs },
-  photoThumb: { width: 80, height: 80, borderRadius: BorderRadius.md, marginRight: Spacing.sm, borderWidth: 1, borderColor: Colors.border },
+  photoStrip: { marginTop: Spacing.xs },
+  photoThumbWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    marginRight: Spacing.sm,
+    backgroundColor: '#F1F5F9',
+    position: 'relative',
+  },
+  photoThumb: { width: '100%', height: '100%' },
+  zoomBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  zoomText: { color: '#FFFFFF', fontSize: 10, fontWeight: FontWeight.bold },
 
   mapCard: {
-    backgroundColor: Colors.card, borderRadius: BorderRadius.xl, padding: Spacing.lg,
-    marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.borderLight,
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6, elevation: 2,
+    backgroundColor: Colors.white, borderRadius: BorderRadius.lg, padding: Spacing.base,
+    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight,
   },
   mapHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   mapCardTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
@@ -400,4 +471,20 @@ const styles = StyleSheet.create({
   acceptBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   quoteBadge: { flex: 1, paddingVertical: Spacing.xs, borderRadius: BorderRadius.md, alignItems: 'center' },
   quoteBadgeText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+  cancelBtn: { marginTop: Spacing.sm },
+
+  modalContainer: { flex: 1, backgroundColor: '#000000' },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.base,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222222',
+  },
+  modalTitle: { color: '#FFFFFF', fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  modalCloseBtn: { padding: Spacing.xs },
+  modalCloseText: { color: '#EF4444', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  modalImageContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  modalImage: { width: '100%', height: '100%' },
 });
