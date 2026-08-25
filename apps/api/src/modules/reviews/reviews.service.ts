@@ -65,12 +65,18 @@ export class ReviewsService {
     }
 
     return this.dataSource.transaction(async (manager) => {
+      const ratingVal = dto.rating ?? 5;
       const review = manager.create(ReviewEntity, {
         jobId,
         customerId: job.customerId,
         fixerId: job.fixerId,
-        rating: dto.rating,
-        comment: dto.comment ?? null,
+        overallRating: ratingVal,
+        serviceQuality: dto.serviceQuality ?? ratingVal,
+        communication: dto.communication ?? ratingVal,
+        pricing: dto.pricing ?? ratingVal,
+        timeliness: dto.timeliness ?? ratingVal,
+        professionalism: dto.professionalism ?? ratingVal,
+        reviewText: dto.comment ?? dto.reviewText ?? null,
         status: ReviewStatus.VISIBLE,
       });
       const saved = await manager.save(review);
@@ -78,9 +84,9 @@ export class ReviewsService {
       // Update fixer aggregate rating
       const { avg, count } = await manager
         .createQueryBuilder(ReviewEntity, 'r')
-        .select('AVG(r.rating)', 'avg')
+        .select('AVG(r.overallRating)', 'avg')
         .addSelect('COUNT(r.id)', 'count')
-        .where('r.fixer_id = :fixerId AND r.status = :status', {
+        .where('r.fixerId = :fixerId AND r.status = :status', {
           fixerId: job.fixerId,
           status: ReviewStatus.VISIBLE,
         })

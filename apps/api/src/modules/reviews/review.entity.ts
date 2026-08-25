@@ -42,11 +42,40 @@ export class ReviewEntity {
   @Column({ name: 'fixer_id', type: 'uuid' })
   fixerId!: string;
 
-  @Column({ type: 'smallint' })
-  rating!: number;
+  @Column({ name: 'overall_rating', type: 'smallint' })
+  overallRating!: number;
 
-  @Column({ type: 'text', nullable: true })
-  comment!: string | null;
+  get rating(): number {
+    return this.overallRating;
+  }
+  set rating(val: number) {
+    this.overallRating = val;
+  }
+
+  @Column({ name: 'service_quality', type: 'smallint', default: 5 })
+  serviceQuality!: number;
+
+  @Column({ name: 'communication', type: 'smallint', default: 5 })
+  communication!: number;
+
+  @Column({ name: 'pricing', type: 'smallint', default: 5 })
+  pricing!: number;
+
+  @Column({ name: 'timeliness', type: 'smallint', default: 5 })
+  timeliness!: number;
+
+  @Column({ name: 'professionalism', type: 'smallint', default: 5 })
+  professionalism!: number;
+
+  @Column({ name: 'review_text', type: 'text', nullable: true })
+  reviewText!: string | null;
+
+  get comment(): string | null {
+    return this.reviewText;
+  }
+  set comment(val: string | null) {
+    this.reviewText = val;
+  }
 
   @Column({
     type: 'enum',
