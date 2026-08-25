@@ -2,9 +2,16 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text, StyleSheet } from 'react-native';
-import { MainTabParamList, FindFixerStackParamList, ChatStackParamList, ProfileStackParamList } from './types';
+import {
+  MainTabParamList,
+  RequestsStackParamList,
+  FindFixerStackParamList,
+  ChatStackParamList,
+  ProfileStackParamList,
+} from './types';
 import { HomeNavigator } from './HomeNavigator';
 import { RequestsListScreen } from '../screens/requests/RequestsListScreen';
+import { RequestDetailScreen } from '../screens/requests/RequestDetailScreen';
 import { FixerSearchScreen } from '../screens/fixer/FixerSearchScreen';
 import { FixerProfileScreen } from '../screens/fixer/FixerProfileScreen';
 import { ConversationListScreen } from '../screens/chat/ConversationListScreen';
@@ -18,6 +25,23 @@ import { NotificationsScreen } from '../screens/profile/NotificationsScreen';
 import { CustomerJobDetailScreen } from '../screens/profile/CustomerJobDetailScreen';
 import { Colors, FontSize, FontWeight } from '../theme/tokens';
 
+// ── Requests Stack ──
+const RequestsStack = createNativeStackNavigator<RequestsStackParamList>();
+function RequestsNavigator() {
+  return (
+    <RequestsStack.Navigator screenOptions={{ headerShadowVisible: false }}>
+      <RequestsStack.Screen name="RequestsList" component={RequestsListScreen} options={{ headerShown: false }} />
+      <RequestsStack.Screen name="RequestDetail" component={RequestDetailScreen} options={{ title: 'Request Details' }} />
+      <RequestsStack.Screen name="FixerProfile" component={FixerProfileScreen} options={{ title: 'Fixer Profile' }} />
+      <RequestsStack.Screen
+        name="ChatRoom"
+        component={ChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Chat' })}
+      />
+    </RequestsStack.Navigator>
+  );
+}
+
 // ── Fixer Stack ──
 const FindFixerStack = createNativeStackNavigator<FindFixerStackParamList>();
 function FindFixerNavigator() {
@@ -25,6 +49,11 @@ function FindFixerNavigator() {
     <FindFixerStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <FindFixerStack.Screen name="FixerSearch" component={FixerSearchScreen} options={{ headerShown: false }} />
       <FindFixerStack.Screen name="FixerProfile" component={FixerProfileScreen} options={{ title: 'Fixer Profile' }} />
+      <FindFixerStack.Screen
+        name="ChatRoom"
+        component={ChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Chat' })}
+      />
     </FindFixerStack.Navigator>
   );
 }
@@ -56,6 +85,11 @@ function ProfileNavigator() {
       <ProfileStack.Screen name="AddAddress" component={AddAddressScreen} options={{ title: 'Add Address' }} />
       <ProfileStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <ProfileStack.Screen name="JobDetail" component={CustomerJobDetailScreen} options={{ title: 'Job Details' }} />
+      <ProfileStack.Screen
+        name="ChatRoom"
+        component={ChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Chat' })}
+      />
     </ProfileStack.Navigator>
   );
 }
@@ -86,7 +120,7 @@ export function MainTabNavigator() {
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="RequestsTab" component={RequestsListScreen} options={{ tabBarLabel: 'Requests' }} />
+      <Tab.Screen name="RequestsTab" component={RequestsNavigator} options={{ tabBarLabel: 'Requests' }} />
       <Tab.Screen name="FindFixerTab" component={FindFixerNavigator} options={{ tabBarLabel: 'Find Fixer' }} />
       <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ tabBarLabel: 'Chat' }} />
       <Tab.Screen name="ProfileTab" component={ProfileNavigator} options={{ tabBarLabel: 'Profile' }} />
@@ -99,12 +133,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopColor: Colors.borderLight,
     height: 60,
-    paddingBottom: 6,
+    paddingBottom: 8,
     paddingTop: 4,
   },
-  tabIcon: { fontSize: 22 },
   tabLabel: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
+  },
+  tabIcon: {
+    fontSize: 20,
   },
 });

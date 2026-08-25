@@ -6,7 +6,6 @@ import {
   JoinColumn,
   CreateDateColumn,
 } from 'typeorm';
-import { MediaType } from '@fixme/shared-types';
 import { MessageEntity } from './message.entity';
 
 @Entity('message_attachments')
@@ -21,14 +20,18 @@ export class MessageAttachmentEntity {
   @Column({ name: 'message_id', type: 'uuid' })
   messageId!: string;
 
-  @Column({ type: 'enum', enum: MediaType })
-  type!: MediaType;
-
   @Column({ name: 'storage_key', type: 'varchar', length: 512 })
   storageKey!: string;
 
-  @Column({ name: 'original_name', type: 'varchar', length: 255 })
-  originalName!: string;
+  @Column({ type: 'varchar', length: 500 })
+  filename!: string;
+
+  get originalName(): string {
+    return this.filename;
+  }
+  set originalName(val: string) {
+    this.filename = val;
+  }
 
   @Column({ name: 'mime_type', type: 'varchar', length: 100 })
   mimeType!: string;

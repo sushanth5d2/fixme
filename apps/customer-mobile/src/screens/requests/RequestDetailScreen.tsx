@@ -211,36 +211,83 @@ export function RequestDetailScreen({ route, navigation }: any) {
             <Text style={styles.noQuotesText}>Waiting for verified fixers to send quotes...</Text>
           </View>
         ) : (
-          quotes.map((q) => (
-            <View key={q.id} style={styles.quoteCard}>
-              <View style={styles.quoteHeader}>
-                <Text style={styles.fixerName}>{q.fixer.companyName}</Text>
-                <Text style={styles.quoteAmount}>₹{Number(q.amount).toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={styles.fixerStats}>
-                <Text style={styles.fixerStat}>★ {Number(q.fixer.averageRating).toFixed(1)}</Text>
-                <Text style={styles.fixerStat}>{q.fixer.completedJobs} jobs</Text>
-                {q.warrantyDays > 0 && <Text style={styles.fixerStat}>{q.warrantyDays}d warranty</Text>}
-                {q.estimatedDurationHours && <Text style={styles.fixerStat}>{q.estimatedDurationHours}h est.</Text>}
-              </View>
-              {q.diagnosisNotes && <Text style={styles.diagnosis}>{q.diagnosisNotes}</Text>}
-              
-              {q.status === 'SUBMITTED' || q.status === 'VIEWED' ? (
-                <Button
-                  title="Accept Quote"
-                  onPress={() => handleAcceptQuote(q.id, q.fixer.companyName, Number(q.amount))}
-                  loading={accepting === q.id}
-                  size="sm"
-                />
-              ) : (
-                <View style={[styles.quoteBadge, { backgroundColor: q.status === 'ACCEPTED' ? Colors.successBg : Colors.errorBg }]}>
-                  <Text style={[styles.quoteBadgeText, { color: q.status === 'ACCEPTED' ? Colors.success : Colors.error }]}>
-                    {q.status}
-                  </Text>
+          quotes.map((q) => {
+            const amountVal = Number(q.estimatedTotal ?? q.amount ?? 0);
+            const notesText = q.notes || q.diagnosisNotes;
+            const fixerId = q.fixer?.id || q.fixerId;
+
+            return (
+              <View key={q.id} style={styles.quoteCard}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.quoteFixerHeader}
+                  onPress={() => {
+                    if (fixerId) {
+                      navigation.navigate('FixerProfile', { fixerId });
+                    }
+                  }}
+                >
+                  <View style={styles.fixerInfo}>
+                    <View style={styles.fixerNameRow}>
+                      <Text style={styles.fixerName}>{q.fixer?.companyName || q.fixer?.ownerName || 'Verified Fixer'}</Text>
+                      <Text style={styles.viewProfileTag}>View Profile 🔍</Text>
+                    </View>
+                    <View style={styles.fixerStats}>
+                      <Text style={styles.fixerStat}>★ {Number(q.fixer?.averageRating || 0).toFixed(1)}</Text>
+                      <Text style={styles.fixerStat}>{q.fixer?.completedJobs || 0} jobs</Text>
+                      {q.warrantyDays > 0 && <Text style={styles.fixerStat}>{q.warrantyDays}d warranty</Text>}
+                      {q.estimatedDurationHours && <Text style={styles.fixerStat}>{q.estimatedDurationHours}h est.</Text>}
+                    </View>
+                  </View>
+                  <Text style={styles.quoteAmount}>₹{amountVal.toLocaleString('en-IN')}</Text>
+                </TouchableOpacity>
+
+                {notesText ? <Text style={styles.diagnosis}>{notesText}</Text> : null}
+
+                <View style={styles.quoteActions}>
+                  <TouchableOpacity
+                    style={styles.chatFixerBtn}
+                    onPress={async () => {
+                      try {
+                        const { data } = await api.post('/chat/conversations', { requestId: request.id });
+                        const conv = data?.data || data;
+                        if (conv?.id) {
+                          navigation.navigate('ChatRoom', {
+                            conversationId: conv.id,
+                            otherUserName: q.fixer?.companyName || 'Fixer',
+                          });
+                        }
+                      } catch (err: any) {
+                        Alert.alert('Error', err?.response?.data?.message || 'Failed to open chat');
+                      }
+                    }}
+                  >
+                    <Text style={styles.chatFixerBtnText}>💬 Chat</Text>
+                  </TouchableOpacity>
+
+                  {q.status === 'SUBMITTED' || q.status === 'VIEWED' ? (
+                    <TouchableOpacity
+                      style={styles.acceptBtn}
+                      onPress={() => handleAcceptQuote(q.id, q.fixer?.companyName || 'Fixer', amountVal)}
+                      disabled={accepting === q.id}
+                    >
+                      {accepting === q.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.acceptBtnText}>Accept Quote ✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.quoteBadge, { backgroundColor: q.status === 'ACCEPTED' ? Colors.successBg : Colors.errorBg }]}>
+                      <Text style={[styles.quoteBadgeText, { color: q.status === 'ACCEPTED' ? Colors.success : Colors.error }]}>
+                        {q.status}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-          ))
+              </View>
+            );
+          })
         )}
       </View>
 
@@ -296,15 +343,49 @@ const styles = StyleSheet.create({
   noQuotesText: { fontSize: FontSize.sm, color: Colors.muted, fontStyle: 'italic' },
 
   quoteCard: {
-    backgroundColor: Colors.card, borderRadius: BorderRadius.lg, padding: Spacing.base,
-    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  quoteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  fixerName: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.text },
+  quoteFixerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xs,
+    paddingBottom: Spacing.xs,
+  },
+  fixerInfo: { flex: 1, marginRight: Spacing.sm },
+  fixerNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 2 },
+  fixerName: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  viewProfileTag: { fontSize: 11, fontWeight: FontWeight.semibold, color: Colors.accent },
   quoteAmount: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.accent },
-  fixerStats: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.sm },
+  fixerStats: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginVertical: Spacing.xs },
   fixerStat: { fontSize: FontSize.xs, color: Colors.muted, backgroundColor: Colors.bg, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
-  diagnosis: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.md },
-  quoteBadge: { paddingVertical: Spacing.xs, borderRadius: BorderRadius.md, alignItems: 'center' },
+  diagnosis: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.sm },
+  quoteActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs },
+  chatFixerBtn: {
+    flex: 1,
+    backgroundColor: Colors.accentSoft,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  chatFixerBtnText: { color: Colors.accent, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  acceptBtn: {
+    flex: 1.5,
+    backgroundColor: Colors.accent,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  quoteBadge: { flex: 1, paddingVertical: Spacing.xs, borderRadius: BorderRadius.md, alignItems: 'center' },
   quoteBadgeText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
 });
