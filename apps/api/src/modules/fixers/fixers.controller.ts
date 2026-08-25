@@ -127,7 +127,10 @@ export class FixersController {
 
   @Get('search')
   @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Search verified fixers by category, brand, city, or pincode' })
+  @ApiOperation({ summary: 'Search fixers by name, location, city, pincode, category, or brand' })
+  @ApiQuery({ name: 'query', required: false, type: 'string' })
+  @ApiQuery({ name: 'name', required: false, type: 'string' })
+  @ApiQuery({ name: 'location', required: false, type: 'string' })
   @ApiQuery({ name: 'categoryId', required: false, type: 'string' })
   @ApiQuery({ name: 'brandId', required: false, type: 'string' })
   @ApiQuery({ name: 'city', required: false, type: 'string' })
@@ -135,14 +138,20 @@ export class FixersController {
   @ApiQuery({ name: 'page', required: false, type: 'number', example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: 'number', example: 20 })
   public search(
+    @Query('query') queryParam?: string,
+    @Query('name') name?: string,
+    @Query('location') location?: string,
     @Query('categoryId') categoryId?: string,
     @Query('brandId') brandId?: string,
     @Query('city') city?: string,
     @Query('pincode') pincode?: string,
     @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('limit') limit = 50,
   ) {
     return this.fixersService.search({
+      query: queryParam,
+      name,
+      location,
       categoryId,
       brandId,
       city,

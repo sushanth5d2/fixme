@@ -321,6 +321,9 @@ export class FixersService {
   // ── Search (public facing) ─────────────────────────────────
 
   public async search(params: {
+    query?: string;
+    name?: string;
+    location?: string;
     categoryId?: string;
     brandId?: string;
     city?: string;
@@ -328,42 +331,67 @@ export class FixersService {
     page?: number;
     limit?: number;
   }): Promise<{ data: FixerEntity[]; total: number }> {
-    const { categoryId, brandId, city, pincode, page = 1, limit = 20 } = params;
+    const { query: searchParam, name, location, categoryId, brandId, city, pincode, page = 1, limit = 50 } = params;
 
-    const query = this.fixerRepo
+    const qb = this.fixerRepo
       .createQueryBuilder('fixer')
       .leftJoinAndSelect('fixer.services', 'svc')
+      .leftJoinAndSelect('svc.category', 'cat')
       .leftJoinAndSelect('fixer.serviceAreas', 'area')
-      .where('fixer.verification_status = :status', {
-        status: FixerVerificationStatus.VERIFIED,
+      .where('fixer.verification_status IN (:...statuses)', {
+        statuses: [
+          FixerVerificationStatus.VERIFIED,
+          FixerVerificationStatus.REGISTERED,
+          FixerVerificationStatus.DOCUMENT_SUBMITTED,
+        ],
       });
 
-    if (categoryId) {
-      query.andWhere('svc.category_id = :categoryId', { categoryId });
-    }
-    if (brandId) {
-      query.andWhere('(svc.brand_id = :brandId OR svc.brand_id IS NULL)', { brandId });
-    }
-    if (city) {
-      query.andWhere(
-        '(fixer.city ILIKE :city OR area.city ILIKE :city)',
-        { city: `%${city}%` },
-      );
-    }
-    if (pincode) {
-      query.andWhere(
-        '(fixer.pincode = :pincode OR area.pincode = :pincode)',
-        { pincode },
+    if (searchParam && searchParam.trim()) {
+      const term = `%${searchParam.trim()}%`;
+      qb.andWhere(
+        '(fixer.company_name ILIKE :term OR fixer.owner_name ILIKE :term OR fixer.city ILIKE :term OR fixer.pincode ILIKE :term OR fixer.address_line ILIKE :term OR area.area_name ILIKE :term OR area.city ILIKE :term OR area.pincode ILIKE :term)',
+        { term },
       );
     }
 
-    query
+    if (name && name.trim()) {
+      qb.andWhere('(fixer.company_name ILIKE :name OR fixer.owner_name ILIKE :name)', {
+        name: `%${name.trim()}%`,
+      });
+    }
+
+    if (location && location.trim()) {
+      qb.andWhere('(fixer.address_line ILIKE :loc OR area.area_name ILIKE :loc OR fixer.city ILIKE :loc)', {
+        loc: `%${location.trim()}%`,
+      });
+    }
+
+    if (categoryId) {
+      qb.andWhere('svc.category_id = :categoryId', { categoryId });
+    }
+    if (brandId) {
+      qb.andWhere('(svc.brand_id = :brandId OR svc.brand_id IS NULL)', { brandId });
+    }
+    if (city && city.trim()) {
+      qb.andWhere(
+        '(fixer.city ILIKE :city OR area.city ILIKE :city)',
+        { city: `%${city.trim()}%` },
+      );
+    }
+    if (pincode && pincode.trim()) {
+      qb.andWhere(
+        '(fixer.pincode = :pincode OR area.pincode = :pincode)',
+        { pincode: pincode.trim() },
+      );
+    }
+
+    qb
       .orderBy('fixer.average_rating', 'DESC')
       .addOrderBy('fixer.completed_jobs', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
-    const [data, total] = await query.getManyAndCount();
+    const [data, total] = await qb.getManyAndCount();
     return { data, total };
   }
 

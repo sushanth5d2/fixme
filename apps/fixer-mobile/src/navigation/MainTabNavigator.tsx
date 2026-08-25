@@ -5,11 +5,13 @@ import { Text, StyleSheet } from 'react-native';
 import {
   MainTabParamList,
   FeedStackParamList,
+  MapStackParamList,
   JobsStackParamList,
   ChatStackParamList,
   ProfileStackParamList,
 } from './types';
 import { RequestFeedScreen } from '../screens/home/RequestFeedScreen';
+import { FixerMapExplorerScreen } from '../screens/home/FixerMapExplorerScreen';
 import { FixerRequestDetailScreen } from '../screens/home/FixerRequestDetailScreen';
 import { SubmitQuoteScreen } from '../screens/home/SubmitQuoteScreen';
 import { MyQuotesScreen } from '../screens/home/MyQuotesScreen';
@@ -31,13 +33,30 @@ function FeedNavigator() {
     <FeedStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <FeedStack.Screen name="Feed" component={RequestFeedScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="RequestDetail" component={FixerRequestDetailScreen} options={{ title: 'Request Details' }} />
-      <FeedStack.Screen name="SubmitQuote" component={SubmitQuoteScreen} options={{ title: 'Send Quote' }} />
+      <FeedStack.Screen name="SubmitQuote" component={SubmitQuoteScreen} options={{ title: 'Send / Edit Quote' }} />
       <FeedStack.Screen
         name="ChatRoom"
         component={FixerChatRoomScreen}
         options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
       />
     </FeedStack.Navigator>
+  );
+}
+
+// ── Map Explorer Stack ──
+const MapStack = createNativeStackNavigator<MapStackParamList>();
+function MapNavigator() {
+  return (
+    <MapStack.Navigator screenOptions={{ headerShadowVisible: false }}>
+      <MapStack.Screen name="MapExplorer" component={FixerMapExplorerScreen} options={{ headerShown: false }} />
+      <MapStack.Screen name="RequestDetail" component={FixerRequestDetailScreen} options={{ title: 'Request Details' }} />
+      <MapStack.Screen name="SubmitQuote" component={SubmitQuoteScreen} options={{ title: 'Send / Edit Quote' }} />
+      <MapStack.Screen
+        name="ChatRoom"
+        component={FixerChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
+      />
+    </MapStack.Navigator>
   );
 }
 
@@ -48,7 +67,7 @@ function JobsNavigator() {
     <JobsStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <JobsStack.Screen name="JobsList" component={MyJobsScreen} options={{ headerShown: false }} />
       <JobsStack.Screen name="JobDetail" component={FixerJobDetailScreen} options={{ title: 'Job Details' }} />
-      <FeedStack.Screen
+      <JobsStack.Screen
         name="ChatRoom"
         component={FixerChatRoomScreen}
         options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
@@ -91,6 +110,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TAB_ICONS: Record<string, string> = {
   FeedTab: '📋',
+  MapTab: '🗺️',
   MyJobsTab: '🔧',
   MyQuotesTab: '💰',
   ChatTab: '💬',
@@ -110,6 +130,7 @@ export function MainTabNavigator() {
       })}
     >
       <Tab.Screen name="FeedTab" component={FeedNavigator} options={{ tabBarLabel: 'Feed' }} />
+      <Tab.Screen name="MapTab" component={MapNavigator} options={{ tabBarLabel: 'Map' }} />
       <Tab.Screen name="MyJobsTab" component={JobsNavigator} options={{ tabBarLabel: 'My Jobs' }} />
       <Tab.Screen name="MyQuotesTab" component={MyQuotesScreen} options={{ tabBarLabel: 'Quotes' }} />
       <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ tabBarLabel: 'Chat' }} />
@@ -121,14 +142,16 @@ export function MainTabNavigator() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: Colors.white,
-    borderTopColor: Colors.borderLight,
+    borderTopColor: Colors.border,
     height: 60,
-    paddingBottom: 6,
+    paddingBottom: 8,
     paddingTop: 4,
   },
-  tabIcon: { fontSize: 22 },
   tabLabel: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
+  },
+  tabIcon: {
+    fontSize: 20,
   },
 });

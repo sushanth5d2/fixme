@@ -7,6 +7,7 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   FeedTab: undefined;
+  MapTab: undefined;
   MyJobsTab: undefined;
   MyQuotesTab: undefined;
   ChatTab: undefined;
@@ -16,7 +17,14 @@ export type MainTabParamList = {
 export type FeedStackParamList = {
   Feed: undefined;
   RequestDetail: { requestId: string };
-  SubmitQuote: { requestId: string; categoryName: string };
+  SubmitQuote: { requestId: string; categoryName?: string; existingQuote?: any };
+  ChatRoom: { conversationId: string; otherUserName: string };
+};
+
+export type MapStackParamList = {
+  MapExplorer: undefined;
+  RequestDetail: { requestId: string };
+  SubmitQuote: { requestId: string; categoryName?: string; existingQuote?: any };
   ChatRoom: { conversationId: string; otherUserName: string };
 };
 
