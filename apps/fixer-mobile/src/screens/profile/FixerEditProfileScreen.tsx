@@ -395,7 +395,7 @@ export function FixerEditProfileScreen({ navigation }: any) {
           {form.latitude && form.longitude ? (
             <View style={styles.gpsBadge}>
               <Text style={styles.gpsText}>
-                📍 Workshop GPS Pinned: {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)}
+                📍 Workshop GPS Pinned: {Number(form.latitude).toFixed(4)}, {Number(form.longitude).toFixed(4)}
               </Text>
             </View>
           ) : null}

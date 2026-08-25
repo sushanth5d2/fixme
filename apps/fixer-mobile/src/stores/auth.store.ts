@@ -49,9 +49,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   login: async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
+    const { data } = await api.post('/auth/login', { email: email.trim().toLowerCase(), password });
+    const payload = data?.data?.data || data?.data || data;
+    if (payload?.tokens) {
+      await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
+      set({ user: payload.user, isAuthenticated: true });
+    }
   },
 
   signup: async (signupData) => {
@@ -65,9 +68,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       lastName: signupData.lastName || '',
       role: 'FIXER',
     });
-    if (data?.data?.tokens) {
-      await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
-      set({ user: data.data.user, isAuthenticated: true });
+    const payload = data?.data?.data || data?.data || data;
+    if (payload?.tokens) {
+      await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
+      set({ user: payload.user, isAuthenticated: true });
     }
   },
 
@@ -79,10 +83,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   verifyOtp: async (phone, otp) => {
     const cleanMobile = phone.replace(/\D/g, '').slice(-10);
-    const { data } = await api.post('/auth/otp/verify', { mobile: cleanMobile, otp });
-    if (data?.data?.tokens) {
-      await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
-      set({ user: data.data.user, isAuthenticated: true });
+    const { data } = await api.post('/auth/otp/verify', { mobile: cleanMobile, otp: otp.trim() });
+    const payload = data?.data?.data || data?.data || data;
+    if (payload?.tokens) {
+      await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
+      set({ user: payload.user, isAuthenticated: true });
     }
   },
 

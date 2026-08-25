@@ -36,14 +36,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true,
 
   login: async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
+    const { data } = await api.post('/auth/login', { email: email.trim().toLowerCase(), password });
+    const payload = data?.data?.data || data?.data || data;
+    if (payload?.tokens) {
+      await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
+      set({ user: payload.user, isAuthenticated: true });
+    }
   },
 
   signup: async (signupData) => {
     const cleanMobile = signupData.phone.replace(/\D/g, '').slice(-10);
-    await api.post('/auth/signup', {
+    const { data } = await api.post('/auth/signup', {
       email: signupData.email.trim().toLowerCase(),
       mobile: cleanMobile,
       password: signupData.password,
@@ -51,6 +54,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       lastName: signupData.lastName.trim(),
       role: 'CUSTOMER',
     });
+    const payload = data?.data?.data || data?.data || data;
+    if (payload?.tokens) {
+      await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
+      set({ user: payload.user, isAuthenticated: true });
+    }
   },
 
   logout: async () => {
@@ -65,10 +73,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   verifyOtp: async (phone, otp) => {
     const cleanMobile = phone.replace(/\D/g, '').slice(-10);
-    const { data } = await api.post('/auth/otp/verify', { mobile: cleanMobile, otp });
-    if (data?.data?.tokens) {
-      await apiClient.setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
-      set({ user: data.data.user, isAuthenticated: true });
+    const { data } = await api.post('/auth/otp/verify', { mobile: cleanMobile, otp: otp.trim() });
+    const payload = data?.data?.data || data?.data || data;
+    if (payload?.tokens) {
+      await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
+      set({ user: payload.user, isAuthenticated: true });
     }
   },
 
