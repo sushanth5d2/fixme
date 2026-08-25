@@ -7,103 +7,234 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Linking,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
 interface Job {
   id: string;
   status: string;
+  agreedTotal?: number;
+  warrantyDays?: number;
   scheduledDate: string | null;
-  request: { description: string; category: { name: string } };
-  customer: { firstName?: string };
-  quote: { amount: number };
+  scheduledTimeSlot: string | null;
+  fixerNotes?: string | null;
+  request: {
+    id?: string;
+    description?: string;
+    problemDescription?: string;
+    problemTitle?: string;
+    deviceModel: string | null;
+    category?: { name: string };
+    brand?: { name: string } | null;
+    houseBuilding?: string;
+    street?: string;
+    area?: string;
+    city?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  customer: { firstName?: string; lastName?: string; userId?: string };
+  quote?: {
+    id?: string;
+    amount?: number;
+    estimatedTotal?: number;
+    warrantyDays?: number;
+  };
   createdAt: string;
 }
 
-const STATUS_CONFIG: Record<string, { color: string; label: string; icon: string }> = {
-  ASSIGNED: { color: Colors.info, label: 'Assigned', icon: '📋' },
-  FIXER_ON_THE_WAY: { color: '#8B5CF6', label: 'On the Way', icon: '🚗' },
-  DEVICE_RECEIVED: { color: '#8B5CF6', label: 'Device Received', icon: '📦' },
-  DIAGNOSING: { color: Colors.warning, label: 'Diagnosing', icon: '🔍' },
-  REPAIR_IN_PROGRESS: { color: '#F97316', label: 'Repairing', icon: '🔧' },
-  READY_FOR_DELIVERY: { color: Colors.success, label: 'Ready', icon: '✅' },
-  COMPLETED: { color: Colors.success, label: 'Completed', icon: '🎉' },
-  CANCELLED: { color: Colors.error, label: 'Cancelled', icon: '❌' },
+const STATUS_CONFIG: Record<string, { color: string; label: string; icon: string; bg: string }> = {
+  ASSIGNED: { color: Colors.info, label: 'Assigned', icon: '📋', bg: '#EFF6FF' },
+  FIXER_ON_THE_WAY: { color: '#8B5CF6', label: 'On the Way', icon: '🚗', bg: '#F3E8FF' },
+  DEVICE_RECEIVED: { color: '#8B5CF6', label: 'Device Received', icon: '📦', bg: '#F3E8FF' },
+  DIAGNOSING: { color: '#D97706', label: 'Diagnosing', icon: '🔍', bg: '#FEF3C7' },
+  REPAIR_IN_PROGRESS: { color: '#EA580C', label: 'Repairing', icon: '🔧', bg: '#FFEDD5' },
+  READY_FOR_DELIVERY: { color: Colors.success, label: 'Ready for Delivery', icon: '✅', bg: '#DCFCE7' },
+  COMPLETED: { color: Colors.success, label: 'Completed', icon: '🎉', bg: '#DCFCE7' },
+  CANCELLED: { color: Colors.error, label: 'Cancelled', icon: '❌', bg: '#FEE2E2' },
+  DISPUTED: { color: Colors.error, label: 'Disputed', icon: '⚠️', bg: '#FEE2E2' },
 };
 
 export function MyJobsScreen({ navigation }: any) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [startingChat, setStartingChat] = useState<string | null>(null);
 
   const fetchJobs = useCallback(async () => {
     try {
-      const { data } = await api.get('/jobs/mine/fixer?limit=30');
-      const raw = data?.data;
-      const items: Job[] = Array.isArray(raw?.data)
-        ? raw.data
-        : Array.isArray(raw)
-        ? raw
-        : [];
+      const { data } = await api.get('/jobs/mine/fixer?limit=50');
+      const raw = data?.data?.data || data?.data || data;
+      const items: Job[] = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
       setJobs(items);
-    } catch {} finally {
+    } catch (err) {
+      console.error('[Fetch My Jobs Error]', err);
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchJobs(); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      fetchJobs();
+    }, [fetchJobs]),
+  );
 
-  const renderItem = ({ item }: { item: Job }) => {
-    const status = STATUS_CONFIG[item.status] || { color: Colors.muted, label: item.status, icon: '•' };
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate('JobDetail', { jobId: item.id })}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.statusIcon}>{status.icon}</Text>
-          <View style={styles.headerInfo}>
-            <Text style={styles.category}>{item.request?.category?.name}</Text>
-            <View style={[styles.badge, { backgroundColor: status.color + '18' }]}>
-              <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
-            </View>
-          </View>
-        </View>
-
-        <Text style={styles.desc} numberOfLines={2}>{item.request?.description}</Text>
-
-        <View style={styles.cardFooter}>
-          <Text style={styles.amount}>₹{Number(item.quote?.amount).toLocaleString('en-IN')}</Text>
-          {item.scheduledDate && <Text style={styles.schedule}>📅 {item.scheduledDate}</Text>}
-        </View>
-      </TouchableOpacity>
-    );
+  const handleStartChat = async (job: Job) => {
+    setStartingChat(job.id);
+    try {
+      const { data } = await api.post('/chat/conversations', {
+        jobId: job.id,
+        requestId: job.request?.id,
+      });
+      const conv = data?.data || data;
+      if (conv?.id) {
+        navigation.navigate('ChatRoom', {
+          conversationId: conv.id,
+          otherUserName: job.customer?.firstName ? `${job.customer.firstName}` : 'Customer',
+        });
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to open chat');
+    } finally {
+      setStartingChat(null);
+    }
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
+  const openNavigation = (job: Job) => {
+    const req = job.request;
+    if (req?.latitude && req?.longitude) {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${req.latitude},${req.longitude}`);
+    } else {
+      const query = [req?.houseBuilding, req?.street, req?.area, req?.city, req?.pincode].filter(Boolean).join(', ');
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query || 'Bengaluru')}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+      </View>
+    );
+  }
+
+  const renderItem = ({ item }: { item: Job }) => {
+    const status = STATUS_CONFIG[item.status] || { color: Colors.muted, label: item.status, icon: '•', bg: '#F3F4F6' };
+    const amountVal = Number(item.agreedTotal ?? item.quote?.estimatedTotal ?? item.quote?.amount ?? 0);
+    const descText = item.request?.problemDescription || item.request?.description || item.request?.problemTitle || 'Repair Job';
+    const addressStr = [item.request?.area, item.request?.city].filter(Boolean).join(', ');
+
+    return (
+      <View style={styles.card}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('JobDetail', { jobId: item.id })}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.categoryRow}>
+              <Text style={styles.categoryBadge}>{item.request?.category?.name || 'Device'}</Text>
+              {item.request?.brand?.name ? <Text style={styles.brandTag}>· {item.request.brand.name}</Text> : null}
+            </View>
+            <View style={[styles.badge, { backgroundColor: status.bg }]}>
+              <Text style={[styles.badgeText, { color: status.color }]}>
+                {status.icon} {status.label}
+              </Text>
+            </View>
+          </View>
+
+          {item.request?.deviceModel ? (
+            <Text style={styles.model}>{item.request.deviceModel}</Text>
+          ) : null}
+
+          <Text style={styles.desc} numberOfLines={2}>
+            {descText}
+          </Text>
+
+          {addressStr ? (
+            <Text style={styles.locationText}>📍 {addressStr}</Text>
+          ) : null}
+
+          <View style={styles.cardFooter}>
+            <View>
+              <Text style={styles.amountLabel}>Agreed Amount</Text>
+              <Text style={styles.amount}>₹{amountVal.toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={styles.metaCol}>
+              <Text style={styles.warranty}>{item.warrantyDays || item.quote?.warrantyDays || 0}d warranty</Text>
+              <Text style={styles.date}>
+                {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Action Row */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={styles.chatBtn}
+            onPress={() => handleStartChat(item)}
+            disabled={startingChat === item.id}
+          >
+            {startingChat === item.id ? (
+              <ActivityIndicator size="small" color={Colors.accent} />
+            ) : (
+              <Text style={styles.chatBtnText}>💬 Chat</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.navBtn}
+            onPress={() => openNavigation(item)}
+          >
+            <Text style={styles.navBtnText}>🗺️ Maps</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.detailBtn}
+            onPress={() => navigation.navigate('JobDetail', { jobId: item.id })}
+          >
+            <Text style={styles.detailBtnText}>Manage Job 🔧</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Jobs</Text>
-        <Text style={styles.count}>{jobs.length} jobs</Text>
+        <Text style={styles.title}>My Assigned Jobs 🔧</Text>
+        <Text style={styles.count}>{jobs.length} active jobs</Text>
       </View>
+
       <FlatList
         data={jobs}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchJobs(); }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchJobs();
+            }}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>🔧</Text>
-            <Text style={styles.emptyTitle}>No jobs yet</Text>
-            <Text style={styles.emptyText}>Jobs will appear here when a customer accepts your quote</Text>
+            <Text style={styles.emptyTitle}>No active jobs assigned yet</Text>
+            <Text style={styles.emptyText}>
+              When a customer accepts your submitted quote, the job will immediately appear here.
+            </Text>
           </View>
         }
       />
@@ -115,29 +246,89 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: Colors.white, paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xxxl + 10, paddingBottom: Spacing.base,
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.xl + 10,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
-  title: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
-  count: { fontSize: FontSize.sm, color: Colors.muted },
-  list: { padding: Spacing.base, paddingTop: Spacing.md },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  count: { fontSize: FontSize.xs, color: Colors.muted, fontWeight: FontWeight.medium },
+  list: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
   card: {
-    backgroundColor: Colors.card, borderRadius: BorderRadius.lg, padding: Spacing.base,
-    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
-  statusIcon: { fontSize: 24, marginRight: Spacing.md },
-  headerInfo: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  category: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  badge: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
-  badgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
-  desc: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.md },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  amount: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
-  schedule: { fontSize: FontSize.xs, color: Colors.muted },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  categoryBadge: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent, backgroundColor: Colors.accentSoft, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
+  brandTag: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  badge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full },
+  badgeText: { fontSize: 11, fontWeight: FontWeight.bold },
+  model: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginTop: 4 },
+  desc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, lineHeight: 18 },
+  locationText: { fontSize: 11, color: Colors.text, fontWeight: FontWeight.medium, marginTop: 4 },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingTop: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  amountLabel: { fontSize: 10, color: Colors.muted, fontWeight: FontWeight.medium },
+  amount: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.accent },
+  metaCol: { alignItems: 'flex-end' },
+  warranty: { fontSize: 11, fontWeight: FontWeight.semibold, color: '#15803D' },
+  date: { fontSize: 10, color: Colors.muted, marginTop: 1 },
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingTop: Spacing.xs,
+  },
+  chatBtn: {
+    flex: 1,
+    backgroundColor: Colors.accentSoft,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  chatBtnText: { color: Colors.accent, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  navBtn: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBtnText: { color: Colors.text, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  detailBtn: {
+    flex: 1.4,
+    backgroundColor: Colors.accent,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   empty: { alignItems: 'center', paddingTop: Spacing.xxxl },
   emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
-  emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: Spacing.xs },
-  emptyText: { fontSize: FontSize.sm, color: Colors.muted, textAlign: 'center', paddingHorizontal: Spacing.xl },
+  emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
+  emptyText: { fontSize: FontSize.xs, color: Colors.muted, textAlign: 'center', marginTop: 4, paddingHorizontal: Spacing.xl },
 });

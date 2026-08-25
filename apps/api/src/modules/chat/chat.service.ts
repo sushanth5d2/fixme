@@ -15,6 +15,7 @@ import { JobEntity } from '../jobs/job.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { CustomerEntity } from '../customers/customer.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
+import { QuoteEntity } from '../quotes/quote.entity';
 import { SendMessageDto, CreateConversationDto } from './dto/chat.dto';
 
 @Injectable()
@@ -42,6 +43,9 @@ export class ChatService {
 
     @InjectRepository(FixerEntity)
     private readonly fixerRepo: Repository<FixerEntity>,
+
+    @InjectRepository(QuoteEntity)
+    private readonly quoteRepo: Repository<QuoteEntity>,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -76,17 +80,23 @@ export class ChatService {
           conversation.requestId = job.requestId;
           const saved = await manager.save(conversation);
 
+          const members: ConversationMemberEntity[] = [];
+
           const customerMember = new ConversationMemberEntity();
           customerMember.conversationId = saved.id;
           customerMember.userId = job.customer.userId;
           customerMember.role = UserRole.CUSTOMER;
+          members.push(customerMember);
 
-          const fixerMember = new ConversationMemberEntity();
-          fixerMember.conversationId = saved.id;
-          fixerMember.userId = job.fixer.userId;
-          fixerMember.role = UserRole.FIXER;
+          if (job.fixer.userId !== job.customer.userId) {
+            const fixerMember = new ConversationMemberEntity();
+            fixerMember.conversationId = saved.id;
+            fixerMember.userId = job.fixer.userId;
+            fixerMember.role = UserRole.FIXER;
+            members.push(fixerMember);
+          }
 
-          await manager.save([customerMember, fixerMember]);
+          await manager.save(members);
 
           if (dto.initialMessage) {
             const msg = new MessageEntity();
@@ -115,27 +125,59 @@ export class ChatService {
           const cust = await this.customerRepo.findOne({ where: { id: request.customerId } });
           customerUserId = cust?.userId;
         }
-        if (!customerUserId) {
-          throw new BadRequestException('Customer user not found for request');
+
+        let fixerUserId: string | undefined;
+
+        if (customerUserId && userId === customerUserId) {
+          // Caller is the customer
+          if (dto.fixerUserId) {
+            fixerUserId = dto.fixerUserId;
+          } else if (dto.fixerId) {
+            const fixer = await this.fixerRepo.findOne({ where: { id: dto.fixerId } });
+            fixerUserId = fixer?.userId;
+          } else if (dto.quoteId) {
+            const quote = await this.quoteRepo.findOne({ where: { id: dto.quoteId }, relations: ['fixer'] });
+            fixerUserId = quote?.fixer?.userId;
+          } else {
+            // Find fixer who quoted or is assigned
+            const latestQuote = await this.quoteRepo.findOne({
+              where: { requestId: dto.requestId },
+              relations: ['fixer'],
+              order: { createdAt: 'DESC' },
+            });
+            fixerUserId = latestQuote?.fixer?.userId || dto.otherUserId;
+          }
+        } else {
+          // Caller is the fixer
+          fixerUserId = userId;
+          if (!customerUserId) {
+            customerUserId = dto.otherUserId;
+          }
         }
 
-        const fixerUserId = userId;
+        if (!customerUserId) {
+          customerUserId = userId;
+        }
+        if (!fixerUserId) {
+          fixerUserId = userId;
+        }
 
-        // Check if this fixer already has a conversation for this request
-        const existingMember = await this.memberRepo
-          .createQueryBuilder('m')
-          .innerJoin('m.conversation', 'c')
-          .where('c.requestId = :requestId AND m.userId = :userId', {
-            requestId: dto.requestId,
-            userId: fixerUserId,
-          })
-          .getOne();
+        // Check if conversation already exists for this request
+        const existingConversations = await this.conversationRepo.find({
+          where: { requestId: dto.requestId },
+          relations: ['members'],
+        });
 
-        if (existingMember) {
-          const conv = await this.conversationRepo.findOne({
-            where: { id: existingMember.conversationId },
-          });
-          if (conv) return conv;
+        for (const conv of existingConversations) {
+          const memberUserIds = (conv.members || []).map((m) => m.userId);
+          const hasCustomer = memberUserIds.includes(customerUserId);
+          const hasFixer = memberUserIds.includes(fixerUserId);
+          if (hasCustomer && hasFixer) {
+            return conv;
+          }
+          if (customerUserId === fixerUserId && memberUserIds.includes(userId)) {
+            return conv;
+          }
         }
 
         return await this.dataSource.transaction(async (manager) => {
@@ -143,17 +185,23 @@ export class ChatService {
           conversation.requestId = dto.requestId!;
           const saved = await manager.save(conversation);
 
+          const members: ConversationMemberEntity[] = [];
+
           const customerMember = new ConversationMemberEntity();
           customerMember.conversationId = saved.id;
           customerMember.userId = customerUserId!;
           customerMember.role = UserRole.CUSTOMER;
+          members.push(customerMember);
 
-          const fixerMember = new ConversationMemberEntity();
-          fixerMember.conversationId = saved.id;
-          fixerMember.userId = fixerUserId;
-          fixerMember.role = UserRole.FIXER;
+          if (fixerUserId !== customerUserId) {
+            const fixerMember = new ConversationMemberEntity();
+            fixerMember.conversationId = saved.id;
+            fixerMember.userId = fixerUserId!;
+            fixerMember.role = UserRole.FIXER;
+            members.push(fixerMember);
+          }
 
-          await manager.save([customerMember, fixerMember]);
+          await manager.save(members);
 
           if (dto.initialMessage) {
             const msg = new MessageEntity();

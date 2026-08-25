@@ -10,6 +10,7 @@ import { JobEntity } from '../jobs/job.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { CustomerEntity } from '../customers/customer.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
+import { QuoteEntity } from '../quotes/quote.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { AuthModule } from '../auth/auth.module';
       RepairRequestEntity,
       CustomerEntity,
       FixerEntity,
+      QuoteEntity,
     ]),
     AuthModule,
   ],

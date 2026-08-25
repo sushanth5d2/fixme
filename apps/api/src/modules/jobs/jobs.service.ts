@@ -7,9 +7,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { JobStatus } from '@fixme/shared-types';
+import { JobStatus, QuoteStatus } from '@fixme/shared-types';
 import { JobEntity } from './job.entity';
 import { JobStatusHistoryEntity } from './job-status-history.entity';
+import { FixerEntity } from '../fixers/fixer.entity';
+import { QuoteEntity } from '../quotes/quote.entity';
+import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { UpdateJobStatusDto, CancelJobDto, ScheduleJobDto } from './dto/job.dto';
 
 const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
@@ -136,6 +139,42 @@ export class JobsService {
     page = 1,
     limit = 20,
   ): Promise<{ data: JobEntity[]; total: number }> {
+    if (role === 'fixer') {
+      try {
+        const fixer = await this.dataSource.getRepository(FixerEntity).findOne({ where: { userId } });
+        if (fixer) {
+          const acceptedQuotes = await this.dataSource
+            .getRepository(QuoteEntity)
+            .createQueryBuilder('q')
+            .where('q.fixerId = :fixerId AND q.status = :status', {
+              fixerId: fixer.id,
+              status: QuoteStatus.ACCEPTED,
+            })
+            .getMany();
+
+          for (const aq of acceptedQuotes) {
+            const existingJob = await this.jobRepo.findOne({ where: { quoteId: aq.id } });
+            if (!existingJob) {
+              const request = await this.dataSource.getRepository(RepairRequestEntity).findOne({ where: { id: aq.requestId } });
+              if (request) {
+                const backfillJob = new JobEntity();
+                backfillJob.requestId = aq.requestId;
+                backfillJob.quoteId = aq.id;
+                backfillJob.fixerId = fixer.id;
+                backfillJob.customerId = request.customerId;
+                backfillJob.status = JobStatus.ASSIGNED;
+                backfillJob.agreedTotal = Number(aq.estimatedTotal ?? 0);
+                backfillJob.warrantyDays = Number(aq.warrantyDays ?? 0);
+                await this.jobRepo.save(backfillJob);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Backfill in getMyJobs: ${(err as any)?.message}`);
+      }
+    }
+
     const qb = this.jobRepo
       .createQueryBuilder('job')
       .leftJoinAndSelect('job.request', 'request')

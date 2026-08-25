@@ -24,6 +24,26 @@ export class CreateConversationDto {
   @IsUUID()
   requestId?: string;
 
+  @ApiPropertyOptional({ description: 'Target Fixer UUID' })
+  @IsOptional()
+  @IsUUID()
+  fixerId?: string;
+
+  @ApiPropertyOptional({ description: 'Target Fixer User UUID' })
+  @IsOptional()
+  @IsUUID()
+  fixerUserId?: string;
+
+  @ApiPropertyOptional({ description: 'Target Quote UUID' })
+  @IsOptional()
+  @IsUUID()
+  quoteId?: string;
+
+  @ApiPropertyOptional({ description: 'Target Other User UUID' })
+  @IsOptional()
+  @IsUUID()
+  otherUserId?: string;
+
   @ApiPropertyOptional({ example: 'Hello! I would like to discuss the repair.' })
   @IsOptional()
   @IsString()
