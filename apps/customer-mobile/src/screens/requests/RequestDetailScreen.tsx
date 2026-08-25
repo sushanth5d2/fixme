@@ -379,8 +379,11 @@ export function RequestDetailScreen({ route, navigation }: any) {
             </View>
           ) : (
             quotes.map((q) => {
-              const amountVal = Number(q.estimatedTotal ?? q.amount ?? 0);
-              const notesText = q.notes || q.diagnosisNotes;
+              const amountVal =
+                q.status === 'ACCEPTED' && job?.agreedTotal
+                  ? Number(job.agreedTotal)
+                  : Number(q.estimatedTotal ?? q.amount ?? 0);
+              const notesText = (q.status === 'ACCEPTED' && job?.revisionNotes) || q.notes || q.diagnosisNotes;
               const fixerId = q.fixer?.id || q.fixerId;
 
               return (

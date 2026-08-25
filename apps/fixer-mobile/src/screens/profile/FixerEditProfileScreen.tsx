@@ -110,23 +110,30 @@ export function FixerEditProfileScreen({ navigation }: any) {
       return;
     }
 
+    const cleanPin = form.pincode ? form.pincode.replace(/\D/g, '').slice(0, 6) : '';
+    if (cleanPin && cleanPin.length !== 6) {
+      Alert.alert('Invalid Pincode', 'Please enter a valid 6-digit postal pincode.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.patch('/fixers/me', {
+      const payload: any = {
         companyName: form.companyName.trim(),
         ownerName: form.ownerName.trim(),
         experienceYears: parseInt(form.experienceYears, 10) || 1,
-        description: form.description.trim() || undefined,
-        addressLine: form.addressLine.trim() || undefined,
-        city: form.city.trim() || undefined,
-        state: form.state.trim() || undefined,
-        pincode: form.pincode.replace(/\D/g, '').slice(0, 6) || undefined,
-        latitude: form.latitude ?? undefined,
-        longitude: form.longitude ?? undefined,
-        emergencyService: form.emergencyService,
-        workingHoursStart: form.workingHoursStart,
-        workingHoursEnd: form.workingHoursEnd,
-      });
+        emergencyService: !!form.emergencyService,
+      };
+
+      if (form.description?.trim()) payload.description = form.description.trim();
+      if (form.addressLine?.trim()) payload.addressLine = form.addressLine.trim();
+      if (form.city?.trim()) payload.city = form.city.trim();
+      if (form.state?.trim()) payload.state = form.state.trim();
+      if (cleanPin.length === 6) payload.pincode = cleanPin;
+      if (typeof form.latitude === 'number' && !isNaN(form.latitude)) payload.latitude = form.latitude;
+      if (typeof form.longitude === 'number' && !isNaN(form.longitude)) payload.longitude = form.longitude;
+
+      await api.patch('/fixers/me', payload);
 
       Alert.alert('Success 🎉', 'Business profile and workshop address updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() },

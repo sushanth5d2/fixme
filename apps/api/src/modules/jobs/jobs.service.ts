@@ -210,15 +210,22 @@ export class JobsService {
     }
 
     if (dto.accept) {
-      job.agreedTotal = job.revisedTotal || job.agreedTotal;
+      job.agreedTotal = Number(job.revisedTotal || job.agreedTotal);
       job.revisionStatus = QuoteRevisionStatus.APPROVED;
+
+      if (job.quoteId) {
+        await this.dataSource.getRepository(QuoteEntity).update(job.quoteId, {
+          estimatedTotal: job.agreedTotal,
+          ...(job.revisionNotes ? { notes: job.revisionNotes } : {}),
+        });
+      }
     } else {
       job.revisionStatus = QuoteRevisionStatus.DECLINED;
     }
 
     await this.jobRepo.save(job);
     this.logger.log(
-      `Job ${jobId} revision responded by customer: ${dto.accept ? 'APPROVED' : 'DECLINED'}`,
+      `Job ${jobId} revision responded by customer: ${dto.accept ? 'APPROVED' : 'DECLINED'} (agreedTotal: ₹${job.agreedTotal})`,
     );
     return this.getJobById(customerUserId, jobId);
   }
@@ -293,6 +300,7 @@ export class JobsService {
     page = 1,
     limit = 50,
   ): Promise<{ data: JobEntity[]; total: number }> {
+    let effectiveRole: string = role;
     if (role === 'fixer') {
       try {
         const fixer = await this.dataSource
@@ -329,6 +337,14 @@ export class JobsService {
               }
             }
           }
+        } else {
+          // Check if caller is a FixerMember
+          const member = await this.dataSource
+            .getRepository(FixerMemberEntity)
+            .findOne({ where: { userId } });
+          if (member) {
+            effectiveRole = 'fixer_member';
+          }
         }
       } catch (err) {
         this.logger.warn(`Backfill in getMyJobs: ${(err as any)?.message}`);
@@ -345,9 +361,9 @@ export class JobsService {
       .leftJoinAndSelect('job.quote', 'quote')
       .leftJoinAndSelect('job.assignedMember', 'assignedMember');
 
-    if (role === 'fixer') {
+    if (effectiveRole === 'fixer') {
       qb.where('fixer.userId = :userId', { userId });
-    } else if (role === 'fixer_member') {
+    } else if (effectiveRole === 'fixer_member') {
       const member = await this.dataSource
         .getRepository(FixerMemberEntity)
         .findOne({ where: { userId } });

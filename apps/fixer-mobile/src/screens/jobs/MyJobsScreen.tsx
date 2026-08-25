@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
+import { useAuthStore } from '../../stores/auth.store';
 import { api } from '../../services/api';
 
 interface Job {
@@ -68,9 +69,13 @@ export function MyJobsScreen({ navigation }: any) {
   const [startingChat, setStartingChat] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const { user } = useAuthStore();
+  const isMember = user?.role === 'FIXER_MEMBER';
+
   const fetchJobs = useCallback(async () => {
     try {
-      const { data } = await api.get('/jobs/mine/fixer?limit=50');
+      const endpoint = isMember ? '/jobs/mine/member?limit=50' : '/jobs/mine/fixer?limit=50';
+      const { data } = await api.get(endpoint);
       const raw = data?.data?.data || data?.data || data;
       const items: Job[] = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
       setJobs(items);
@@ -80,7 +85,7 @@ export function MyJobsScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isMember]);
 
   useFocusEffect(
     useCallback(() => {

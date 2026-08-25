@@ -39,8 +39,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         // Handle class-validator ValidationPipe errors (array of strings)
         if (Array.isArray(rawMessage)) {
           errorCode = 'VALIDATION_ERROR';
-          message = 'Validation failed';
-          details = (rawMessage as string[]).map((msg) => ({ message: msg }));
+          const validationMessages = rawMessage as string[];
+          message = validationMessages.join('; ');
+          details = validationMessages.map((msg) => ({ message: msg }));
         } else {
           message = typeof rawMessage === 'string' ? rawMessage : exception.message;
           errorCode =
@@ -59,11 +60,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
-    // Log all 5xx errors
+    // Log all errors for immediate debugging
     if (statusCode >= 500) {
       this.logger.error(
-        `${statusCode} ${(request.method)} ${request.url} [${requestId}]`,
+        `[API Error ${statusCode}] ${request.method} ${request.url} [${requestId}]: ${message}`,
         exception instanceof Error ? exception.stack : String(exception),
+      );
+    } else {
+      this.logger.warn(
+        `[API Error ${statusCode}] ${request.method} ${request.url} [${requestId}]: ${message}${
+          details.length > 0 ? ` | Details: ${JSON.stringify(details)}` : ''
+        }`,
       );
     }
 

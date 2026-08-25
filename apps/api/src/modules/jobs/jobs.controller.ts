@@ -103,8 +103,8 @@ export class JobsController {
   }
 
   @Get(['mine/fixer', 'fixer/mine'])
-  @Roles(UserRole.FIXER)
-  @ApiOperation({ summary: '[Fixer] List my assigned jobs' })
+  @Roles(UserRole.FIXER, UserRole.FIXER_MEMBER)
+  @ApiOperation({ summary: '[Fixer/Technician] List assigned jobs' })
   @ApiQuery({ name: 'page', required: false, type: 'number' })
   @ApiQuery({ name: 'limit', required: false, type: 'number' })
   public getMyFixerJobs(
