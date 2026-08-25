@@ -65,6 +65,9 @@ export class QuotesService {
     quote.warrantyDays = Number(dto.warrantyDays ?? 0);
     quote.status = QuoteStatus.SUBMITTED;
     quote.submittedAt = new Date();
+    const validUntilDate = new Date();
+    validUntilDate.setDate(validUntilDate.getDate() + 7);
+    quote.validUntil = validUntilDate.toISOString().split('T')[0];
 
     const saved = await this.quoteRepo.save(quote);
 

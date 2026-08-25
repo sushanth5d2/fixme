@@ -15,17 +15,23 @@ export class ConversationEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'request_id', type: 'uuid', nullable: true })
-  requestId!: string | null;
+  @Index()
+  @Column({ name: 'request_id', type: 'uuid' })
+  requestId!: string;
 
+  @Index()
   @Column({ name: 'job_id', type: 'uuid', nullable: true })
   jobId!: string | null;
 
-  @Column({ name: 'is_active', type: 'boolean', default: true })
-  isActive!: boolean;
-
   @Column({ name: 'last_message_at', type: 'timestamptz', nullable: true })
   lastMessageAt!: Date | null;
+
+  @Column({ name: 'last_message_preview', type: 'varchar', length: 255, nullable: true })
+  lastMessagePreview!: string | null;
+
+  get isActive(): boolean {
+    return true;
+  }
 
   @OneToMany(() => ConversationMemberEntity, (m) => m.conversation)
   members!: ConversationMemberEntity[];
