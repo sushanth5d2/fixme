@@ -154,19 +154,30 @@ export class RepairRequestsService {
       const lat = dto.latitude ?? (addressSnapshot?.latitude as number) ?? null;
       const lng = dto.longitude ?? (addressSnapshot?.longitude as number) ?? null;
 
+      const title = dto.deviceModel
+        ? `${category.name} - ${dto.deviceModel}`
+        : `${category.name} Repair Request`;
+
       const request = this.requestRepo.create({
         customerId: customer.id,
         categoryId: category.id, // Must be UUID of the category
         brandId: dto.brandId ?? null,
         deviceModel: dto.deviceModel ?? null,
-        description: dto.description,
-        priority: dto.priority || UrgencyLevel.MEDIUM,
+        problemTitle: title.slice(0, 500),
+        problemDescription: dto.description,
+        urgency: dto.priority || UrgencyLevel.MEDIUM,
         addressId: finalAddressId,
-        addressSnapshot,
+        houseBuilding: (addressSnapshot?.houseBuilding as string) || dto.houseBuilding || null,
+        street: (addressSnapshot?.street as string) || dto.street || null,
+        area: (addressSnapshot?.area as string) || dto.area || null,
+        landmark: (addressSnapshot?.landmark as string) || dto.landmark || null,
+        city: (addressSnapshot?.city as string) || dto.city || 'Bengaluru',
+        state: (addressSnapshot?.state as string) || dto.state || 'Karnataka',
+        pincode: (addressSnapshot?.pincode as string) || dto.pincode || '560001',
         latitude: lat,
         longitude: lng,
         preferredDate: dto.preferredDate ?? null,
-        preferredTimeSlot: dto.preferredTimeSlot ?? null,
+        preferredTime: dto.preferredTimeSlot ? `${dto.preferredTimeSlot === 'EVENING' ? '16:00:00' : dto.preferredTimeSlot === 'AFTERNOON' ? '12:00:00' : '09:00:00'}` : null,
         status: RequestStatus.OPEN,
       });
 
@@ -321,24 +332,29 @@ export class RepairRequestsService {
 
     const [data, total] = await query.getManyAndCount();
 
-    // Map to safe DTO — strip any PII
+    // Map to safe DTO
     const safeData = data.map((req) => ({
       id: req.id,
       categoryId: req.categoryId,
       brandId: req.brandId,
       deviceModel: req.deviceModel,
+      problemTitle: req.problemTitle,
+      problemDescription: req.problemDescription,
       description: req.description,
       priority: req.priority,
+      urgency: req.urgency,
       status: req.status,
-      // Only broad location — city+pincode from snapshot
-      city: (req.addressSnapshot as Record<string, unknown> | null)?.['city'] ?? null,
-      pincode: (req.addressSnapshot as Record<string, unknown> | null)?.['pincode'] ?? null,
+      area: req.area,
+      city: req.city,
+      pincode: req.pincode,
+      latitude: req.latitude,
+      longitude: req.longitude,
       preferredDate: req.preferredDate,
-      preferredTimeSlot: req.preferredTimeSlot,
+      preferredTime: req.preferredTime,
       createdAt: req.createdAt,
     }));
 
-    return { data: safeData, total };
+    return { data: safeData as any, total };
   }
 
   public async getRequestDetailForFixer(
@@ -353,27 +369,30 @@ export class RepairRequestsService {
       throw new ForbiddenException('This request is no longer available');
     }
 
-    // Return details but NO customer contact info
     return {
       id: request.id,
       category: request.category,
       brand: request.brand,
       deviceModel: request.deviceModel,
+      problemTitle: request.problemTitle,
+      problemDescription: request.problemDescription,
       description: request.description,
       priority: request.priority,
+      urgency: request.urgency,
       status: request.status,
       media: request.media,
       preferredDate: request.preferredDate,
-      preferredTimeSlot: request.preferredTimeSlot,
+      preferredTime: request.preferredTime,
       createdAt: request.createdAt,
-      // Only area/city/pincode — NOT full address or GPS
-      addressSnapshot: request.addressSnapshot
-        ? {
-            area: (request.addressSnapshot as Record<string, unknown>)['area'],
-            city: (request.addressSnapshot as Record<string, unknown>)['city'],
-            pincode: (request.addressSnapshot as Record<string, unknown>)['pincode'],
-          }
-        : null,
+      houseBuilding: request.houseBuilding,
+      street: request.street,
+      area: request.area,
+      landmark: request.landmark,
+      city: request.city,
+      state: request.state,
+      pincode: request.pincode,
+      latitude: request.latitude,
+      longitude: request.longitude,
     };
   }
 

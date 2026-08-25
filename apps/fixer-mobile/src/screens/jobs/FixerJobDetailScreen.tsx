@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -128,12 +129,26 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
         <Text style={styles.description}>{job.request.description}</Text>
       </View>
 
-      {/* Address — shown only after assignment */}
-      {job.request.addressSnapshot && (
+      {/* Address & Live Map Navigation */}
+      {job.request && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service Address</Text>
+          <View style={styles.mapHeaderRow}>
+            <Text style={styles.sectionTitle}>📍 Service Location & Map</Text>
+            <Button
+              title="Navigate 🗺️"
+              onPress={() => {
+                const addr = job.request.addressSnapshot;
+                const query = addr ? [addr.houseBuilding, addr.area, addr.city, addr.pincode].filter(Boolean).join(', ') : 'Bengaluru';
+                Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+              }}
+              variant="outline"
+              size="sm"
+            />
+          </View>
           <Text style={styles.infoText}>
-            📍 {job.request.addressSnapshot.houseBuilding || ''}, {job.request.addressSnapshot.area || ''}, {job.request.addressSnapshot.city} - {job.request.addressSnapshot.pincode}
+            📍 {job.request.addressSnapshot
+              ? `${job.request.addressSnapshot.houseBuilding ? job.request.addressSnapshot.houseBuilding + ', ' : ''}${job.request.addressSnapshot.area ? job.request.addressSnapshot.area + ', ' : ''}${job.request.addressSnapshot.city || 'Bengaluru'} - ${job.request.addressSnapshot.pincode || ''}`
+              : 'Customer Address'}
           </Text>
         </View>
       )}
@@ -184,6 +199,9 @@ const styles = StyleSheet.create({
   section: {
     backgroundColor: Colors.card, borderRadius: BorderRadius.lg, padding: Spacing.base,
     borderWidth: 1, borderColor: Colors.borderLight,
+  },
+  mapHeaderRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs,
   },
   sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: Spacing.sm },
   infoText: { fontSize: FontSize.base, color: Colors.text },

@@ -23,9 +23,13 @@ const CATEGORY_ICONS: Record<string, string> = {
   'washing-machine': '🫧',
   refrigerator: '🧊',
   microwave: '🍳',
+  plumbing: '🚰',
+  mechanical: '🚗',
+  electrical: '⚡',
   printer: '🖨️',
   camera: '📷',
   tablet: '📲',
+  other: '🛠️',
 };
 
 interface Category {
@@ -50,7 +54,11 @@ const FALLBACK_CATEGORIES: Category[] = [
   { id: 'washing-machine', name: 'Washing Machine', slug: 'washing-machine' },
   { id: 'refrigerator', name: 'Refrigerator', slug: 'refrigerator' },
   { id: 'microwave', name: 'Microwave & Oven', slug: 'microwave' },
+  { id: 'plumbing', name: 'Plumbing Services', slug: 'plumbing' },
+  { id: 'mechanical', name: 'Mechanical & Auto', slug: 'mechanical' },
+  { id: 'electrical', name: 'Electrical & Wiring', slug: 'electrical' },
   { id: 'printer', name: 'Printer & Scanner', slug: 'printer' },
+  { id: 'other', name: 'Other Electronics', slug: 'other' },
 ];
 
 export function HomeScreen({ navigation }: Props) {

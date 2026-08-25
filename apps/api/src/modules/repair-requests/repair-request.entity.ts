@@ -48,8 +48,19 @@ export class RepairRequestEntity {
   @Column({ name: 'device_model', type: 'varchar', length: 200, nullable: true })
   deviceModel!: string | null;
 
-  @Column({ type: 'text' })
-  description!: string;
+  @Column({ name: 'problem_title', type: 'varchar', length: 500, default: '' })
+  problemTitle!: string;
+
+  @Column({ name: 'problem_description', type: 'text' })
+  problemDescription!: string;
+
+  // Compatibility getter/setter for description
+  get description(): string {
+    return this.problemDescription;
+  }
+  set description(val: string) {
+    this.problemDescription = val;
+  }
 
   @Column({
     type: 'enum',
@@ -59,8 +70,24 @@ export class RepairRequestEntity {
   @Index()
   status!: RequestStatus;
 
-  @Column({ type: 'enum', enum: UrgencyLevel, default: UrgencyLevel.MEDIUM })
-  priority!: UrgencyLevel;
+  @Column({
+    name: 'urgency',
+    type: 'enum',
+    enum: UrgencyLevel,
+    default: UrgencyLevel.MEDIUM,
+  })
+  urgency!: UrgencyLevel;
+
+  // Compatibility getter/setter for priority
+  get priority(): UrgencyLevel {
+    return this.urgency;
+  }
+  set priority(val: UrgencyLevel) {
+    this.urgency = val;
+  }
+
+  @Column({ name: 'warranty_status', type: 'boolean', default: false })
+  warrantyStatus!: boolean;
 
   @ManyToOne(() => AddressEntity, { nullable: true })
   @JoinColumn({ name: 'address_id' })
@@ -69,8 +96,26 @@ export class RepairRequestEntity {
   @Column({ name: 'address_id', type: 'uuid', nullable: true })
   addressId!: string | null;
 
-  @Column({ name: 'address_snapshot', type: 'jsonb', nullable: true })
-  addressSnapshot!: Record<string, unknown> | null;
+  @Column({ name: 'house_building', type: 'varchar', length: 255, nullable: true })
+  houseBuilding!: string | null;
+
+  @Column({ name: 'street', type: 'varchar', length: 255, nullable: true })
+  street!: string | null;
+
+  @Column({ name: 'area', type: 'varchar', length: 255, nullable: true })
+  area!: string | null;
+
+  @Column({ name: 'landmark', type: 'varchar', length: 255, nullable: true })
+  landmark!: string | null;
+
+  @Column({ name: 'city', type: 'varchar', length: 100, default: 'Bengaluru' })
+  city!: string;
+
+  @Column({ name: 'state', type: 'varchar', length: 100, default: 'Karnataka' })
+  state!: string;
+
+  @Column({ name: 'pincode', type: 'varchar', length: 6, default: '560001' })
+  pincode!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
   latitude!: number | null;
@@ -81,8 +126,8 @@ export class RepairRequestEntity {
   @Column({ name: 'preferred_date', type: 'date', nullable: true })
   preferredDate!: string | null;
 
-  @Column({ name: 'preferred_time_slot', type: 'varchar', length: 50, nullable: true })
-  preferredTimeSlot!: string | null;
+  @Column({ name: 'preferred_time', type: 'time', nullable: true })
+  preferredTime!: string | null;
 
   @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })
   cancelledAt!: Date | null;

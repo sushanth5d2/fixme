@@ -17,7 +17,11 @@ const DEFAULT_CATEGORIES = [
   { name: 'Washing Machine', slug: 'washing-machine', sortOrder: 5 },
   { name: 'Refrigerator', slug: 'refrigerator', sortOrder: 6 },
   { name: 'Microwave & Oven', slug: 'microwave', sortOrder: 7 },
-  { name: 'Printer & Scanner', slug: 'printer', sortOrder: 8 },
+  { name: 'Plumbing Services', slug: 'plumbing', sortOrder: 8 },
+  { name: 'Mechanical & Auto', slug: 'mechanical', sortOrder: 9 },
+  { name: 'Electrical & Wiring', slug: 'electrical', sortOrder: 10 },
+  { name: 'Printer & Scanner', slug: 'printer', sortOrder: 11 },
+  { name: 'Other Electronics', slug: 'other', sortOrder: 12 },
 ];
 
 @Injectable()
@@ -31,37 +35,33 @@ export class CategoriesService implements OnModuleInit {
 
   public async onModuleInit(): Promise<void> {
     try {
-      const count = await this.categoryRepo.count();
-      if (count === 0) {
-        this.logger.log('Seeding default device categories...');
-        for (const cat of DEFAULT_CATEGORIES) {
+      this.logger.log('Syncing default service categories...');
+      for (const cat of DEFAULT_CATEGORIES) {
+        const existing = await this.categoryRepo.findOne({ where: { slug: cat.slug } });
+        if (!existing) {
           await this.categoryRepo.save(this.categoryRepo.create({ ...cat, isActive: true }));
         }
-        this.logger.log(`Successfully seeded ${DEFAULT_CATEGORIES.length} device categories.`);
       }
+      this.logger.log(`Service categories synced successfully.`);
     } catch (err) {
       this.logger.warn(`Could not auto-seed categories: ${err}`);
     }
   }
 
   public async findAll(): Promise<DeviceCategoryEntity[]> {
-    let list = await this.categoryRepo.find({
+    for (const cat of DEFAULT_CATEGORIES) {
+      try {
+        const existing = await this.categoryRepo.findOne({ where: { slug: cat.slug } });
+        if (!existing) {
+          await this.categoryRepo.save(this.categoryRepo.create({ ...cat, isActive: true }));
+        }
+      } catch {}
+    }
+
+    return this.categoryRepo.find({
       where: { isActive: true },
       order: { sortOrder: 'ASC', name: 'ASC' },
     });
-    if (list.length === 0) {
-      // Lazy seed on first request if empty
-      for (const cat of DEFAULT_CATEGORIES) {
-        try {
-          await this.categoryRepo.save(this.categoryRepo.create({ ...cat, isActive: true }));
-        } catch {}
-      }
-      list = await this.categoryRepo.find({
-        where: { isActive: true },
-        order: { sortOrder: 'ASC', name: 'ASC' },
-      });
-    }
-    return list;
   }
 
   public async findById(id: string): Promise<DeviceCategoryEntity> {
