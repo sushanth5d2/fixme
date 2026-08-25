@@ -20,6 +20,10 @@
     "db:migrate:revert": "npm run db:migrate:revert --workspace=apps/api",
     "db:seed": "npm run db:seed --workspace=apps/api",
     "db:seed:dev": "npm run db:seed:dev --workspace=apps/api",
+    "sync": "node scripts/sync-db.js",
+    "pull": "git pull origin main && node scripts/sync-db.js",
+    "setup:hooks": "git config core.hooksPath .githooks",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "install:all": "npm install"
   },
   "devDependencies": {

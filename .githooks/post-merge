@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# Git post-merge hook: runs automatically after every git pull
+echo ""
+echo "🚀 [Git Hook] 'git pull' detected! Running automated environment refresh..."
+echo ""
+
+node scripts/sync-db.js || ./scripts/sync.sh || true
