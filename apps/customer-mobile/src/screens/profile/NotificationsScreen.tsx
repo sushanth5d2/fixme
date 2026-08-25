@@ -28,8 +28,20 @@ export function NotificationsScreen() {
   const fetch = async () => {
     try {
       const { data } = await api.get('/notifications?limit=50');
-      setNotifications(data.data || []);
-    } catch {} finally { setLoading(false); setRefreshing(false); }
+      const raw = data?.data;
+      const items: Notification[] = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw)
+        ? raw
+        : [];
+      setNotifications(items);
+    } catch (err) {
+      console.error('[Fetch Notifications Error]', err);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => { fetch(); }, []);
@@ -60,18 +72,22 @@ export function NotificationsScreen() {
     }
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
+  const notifsList = Array.isArray(notifications) ? notifications : [];
+
+  if (loading && notifsList.length === 0) {
+    return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
+  }
 
   return (
     <View style={styles.container}>
-      {notifications.some((n) => !n.isRead) && (
+      {notifsList.some((n) => !n.isRead) && (
         <TouchableOpacity style={styles.markAllBtn} onPress={markAllRead}>
           <Text style={styles.markAllText}>Mark all as read</Text>
         </TouchableOpacity>
       )}
 
       <FlatList
-        data={notifications}
+        data={notifsList}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} />}

@@ -10,6 +10,8 @@ import { FixerProfileScreen } from '../screens/fixer/FixerProfileScreen';
 import { ConversationListScreen } from '../screens/chat/ConversationListScreen';
 import { ChatRoomScreen } from '../screens/chat/ChatRoomScreen';
 import { CustomerProfileScreen } from '../screens/profile/CustomerProfileScreen';
+import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
+import { CustomerJobsListScreen } from '../screens/profile/CustomerJobsListScreen';
 import { AddressListScreen } from '../screens/profile/AddressListScreen';
 import { AddAddressScreen } from '../screens/profile/AddAddressScreen';
 import { NotificationsScreen } from '../screens/profile/NotificationsScreen';
@@ -48,6 +50,8 @@ function ProfileNavigator() {
   return (
     <ProfileStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <ProfileStack.Screen name="Profile" component={CustomerProfileScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
+      <ProfileStack.Screen name="MyJobs" component={CustomerJobsListScreen} options={{ title: 'My Jobs' }} />
       <ProfileStack.Screen name="Addresses" component={AddressListScreen} options={{ title: 'My Addresses' }} />
       <ProfileStack.Screen name="AddAddress" component={AddAddressScreen} options={{ title: 'Add Address' }} />
       <ProfileStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
