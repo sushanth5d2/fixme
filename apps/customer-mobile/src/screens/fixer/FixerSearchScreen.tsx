@@ -8,46 +8,43 @@ import {
   ActivityIndicator,
   ScrollView,
   Linking,
-  Dimensions,
 } from 'react-native';
-import { Input, Button } from '../../components/ui';
+import { Input } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
-const { width } = Dimensions.get('window');
+interface FixerService {
+  category: { id: string; name: string };
+  brand: { id: string; name: string } | null;
+}
 
 interface Fixer {
   id: string;
   companyName: string;
   ownerName: string;
   city: string;
-  addressLine?: string | null;
-  pincode?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
+  pincode: string;
+  addressLine?: string;
   averageRating: number;
   totalReviews: number;
   completedJobs: number;
   experienceYears: number;
   emergencyService: boolean;
-  services?: Array<{ category?: { name: string } }>;
-  serviceAreas?: Array<{ areaName: string; city: string; pincode: string }>;
+  services: FixerService[];
+  verificationStatus: string;
 }
 
 export function FixerSearchScreen({ navigation }: any) {
   const [query, setQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
   const [onlyEmergency, setOnlyEmergency] = useState(false);
   const [fixers, setFixers] = useState<Fixer[]>([]);
   const [selectedFixer, setSelectedFixer] = useState<Fixer | null>(null);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [searched, setSearched] = useState(false);
 
   const fetchFixers = useCallback(async (searchQuery = '') => {
     setLoading(true);
-    setSearched(true);
     try {
       const params: any = { limit: 50 };
       const trimmed = searchQuery.trim();
@@ -61,7 +58,6 @@ export function FixerSearchScreen({ navigation }: any) {
       }
 
       if (selectedCity) params.city = selectedCity;
-      if (selectedCategory) params.categoryId = selectedCategory;
 
       const { data } = await api.get('/fixers/search', { params });
       const raw = data?.data?.data || data?.data || data;
@@ -80,131 +76,130 @@ export function FixerSearchScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [selectedCity, selectedCategory, onlyEmergency]);
+  }, [selectedCity, onlyEmergency]);
 
   useEffect(() => {
     fetchFixers(query);
-  }, [fetchFixers, selectedCity, selectedCategory, onlyEmergency]);
+  }, [fetchFixers, query]);
 
-  const renderStars = (rating: number) => {
-    const full = Math.floor(rating || 0);
-    const half = (rating || 0) - full >= 0.5;
-    return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(Math.max(0, 5 - full - (half ? 1 : 0)));
+  const openDirections = (fixer: Fixer) => {
+    const queryStr = [fixer.addressLine, fixer.city, fixer.pincode].filter(Boolean).join(', ');
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryStr || fixer.city || 'Bengaluru')}`);
   };
 
-  const renderItem = ({ item }: { item: Fixer }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('FixerProfile', { fixerId: item.id })}
-    >
-      <View style={styles.cardTop}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(item.companyName || item.ownerName || 'F').charAt(0).toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.info}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{item.companyName || item.ownerName}</Text>
-            <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>✓ Verified</Text>
-            </View>
+  const renderFixerCard = ({ item }: { item: Fixer }) => {
+    const initials = (item.companyName || item.ownerName || 'F')
+      .split(' ')
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase();
+
+    // Deduplicate service category names
+    const uniqueCategories = Array.from(
+      new Set(
+        (item.services || [])
+          .map((s) => s.category?.name)
+          .filter(Boolean)
+      )
+    );
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('FixerProfile', { fixerId: item.id })}
+      >
+        {/* Top Info Row */}
+        <View style={styles.cardTop}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
-          <Text style={styles.owner}>
-            {item.ownerName} · 📍 {item.city || 'City'} {item.pincode ? `(${item.pincode})` : ''}
-          </Text>
-          <View style={styles.ratingRow}>
-            <Text style={styles.stars}>{renderStars(Number(item.averageRating))}</Text>
-            <Text style={styles.ratingText}>
-              {Number(item.averageRating || 0).toFixed(1)} ({item.totalReviews || 0} reviews)
+
+          <View style={styles.info}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {item.companyName || item.ownerName}
+              </Text>
+              <View style={styles.verifiedBadge}>
+                <Text style={styles.verifiedText}>✓ Verified</Text>
+              </View>
+            </View>
+
+            <Text style={styles.ownerText}>
+              {item.ownerName ? `${item.ownerName} · ` : ''}📍 {item.city} {item.pincode ? `(${item.pincode})` : ''}
             </Text>
-          </View>
-        </View>
-      </View>
 
-      {item.services && item.services.length > 0 && (
-        <View style={styles.tagRow}>
-          {item.services.slice(0, 3).map((s, idx) => (
-            <View key={idx} style={styles.tag}>
-              <Text style={styles.tagText}>{s.category?.name || 'Repair'}</Text>
+            {/* Rating and Highlights */}
+            <View style={styles.metaBadgeRow}>
+              <View style={styles.ratingBadge}>
+                <Text style={styles.ratingStar}>★</Text>
+                <Text style={styles.ratingScore}>
+                  {Number(item.averageRating || 5).toFixed(1)}
+                </Text>
+                <Text style={styles.reviewCount}>({item.totalReviews || 0})</Text>
+              </View>
+
+              <View style={styles.highlightBadge}>
+                <Text style={styles.highlightText}>{item.completedJobs || 0} Jobs done</Text>
+              </View>
+
+              <View style={styles.highlightBadge}>
+                <Text style={styles.highlightText}>{item.experienceYears || 1}+ yrs exp</Text>
+              </View>
             </View>
-          ))}
-        </View>
-      )}
-
-      <View style={styles.cardFooter}>
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{item.completedJobs || 0}</Text>
-            <Text style={styles.statLabel}>Jobs</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{item.experienceYears || 1}yr</Text>
-            <Text style={styles.statLabel}>Exp.</Text>
           </View>
         </View>
 
-        {item.emergencyService ? (
-          <View style={styles.emergencyBadge}>
-            <Text style={styles.emergencyText}>⚡ Emergency Service</Text>
+        {/* Specialty Services Tags */}
+        {uniqueCategories.length > 0 ? (
+          <View style={styles.tagRow}>
+            {uniqueCategories.slice(0, 3).map((catName, idx) => (
+              <View key={idx} style={styles.tag}>
+                <Text style={styles.tagText}>🔧 {catName}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
-        <Button
-          title="View Profile 🔍"
-          onPress={() => navigation.navigate('FixerProfile', { fixerId: item.id })}
-          size="sm"
-          variant="outline"
-        />
-      </View>
-    </TouchableOpacity>
-  );
+        {/* Emergency Service Banner */}
+        {item.emergencyService ? (
+          <View style={styles.emergencyBanner}>
+            <Text style={styles.emergencyBannerText}>⚡ 24/7 Emergency Repair Available</Text>
+          </View>
+        ) : null}
+
+        {/* Card Footer Actions */}
+        <View style={styles.cardFooter}>
+          <TouchableOpacity
+            style={styles.directionsBtn}
+            onPress={() => openDirections(item)}
+          >
+            <Text style={styles.directionsBtnText}>🗺️ Maps</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.viewProfileBtn}
+            onPress={() => navigation.navigate('FixerProfile', { fixerId: item.id })}
+          >
+            <Text style={styles.viewProfileBtnText}>View Profile & Rates 🔍</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* Search Header */}
+      {/* Header Controls */}
       <View style={styles.header}>
-        <Text style={styles.title}>Find a Fixer 🔧</Text>
-        <Text style={styles.subtitle}>Search repair professionals by name, city, location, or pincode</Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.title}>Find a Fixer 🔧</Text>
+            <Text style={styles.subtitle}>Verified repair pros near your location</Text>
+          </View>
 
-        <View style={styles.searchRow}>
-          <Input
-            placeholder="Search by name, city, area, pincode (e.g. 560001)..."
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={() => fetchFixers(query)}
-            returnKeyType="search"
-            containerStyle={styles.searchInput}
-          />
-        </View>
-
-        {/* Filters & View Toggle */}
-        <View style={styles.filterBar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
-            <TouchableOpacity
-              style={[styles.filterChip, onlyEmergency && styles.filterChipActive]}
-              onPress={() => setOnlyEmergency(!onlyEmergency)}
-            >
-              <Text style={[styles.filterChipText, onlyEmergency && styles.filterChipTextActive]}>
-                ⚡ Emergency Service
-              </Text>
-            </TouchableOpacity>
-
-            {['Bengaluru', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai'].map((city) => (
-              <TouchableOpacity
-                key={city}
-                style={[styles.filterChip, selectedCity === city && styles.filterChipActive]}
-                onPress={() => setSelectedCity(selectedCity === city ? '' : city)}
-              >
-                <Text style={[styles.filterChipText, selectedCity === city && styles.filterChipTextActive]}>
-                  📍 {city}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Map / List View Switcher */}
+          {/* Map vs List View Switcher */}
           <View style={styles.toggleRow}>
             <TouchableOpacity
               style={[styles.toggleBtn, viewMode === 'list' && styles.toggleBtnActive]}
@@ -224,29 +219,65 @@ export function FixerSearchScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Search Input Bar */}
+        <Input
+          placeholder="Search by name, city, area, pincode (e.g. 560001)..."
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={() => fetchFixers(query)}
+          returnKeyType="search"
+          containerStyle={styles.searchBar}
+        />
+
+        {/* Filter Chips Scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsContainer}
+        >
+          <TouchableOpacity
+            style={[styles.filterChip, onlyEmergency && styles.filterChipActive]}
+            onPress={() => setOnlyEmergency(!onlyEmergency)}
+          >
+            <Text style={[styles.filterChipText, onlyEmergency && styles.filterChipTextActive]}>
+              ⚡ Emergency Service
+            </Text>
+          </TouchableOpacity>
+
+          {['Bengaluru', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai'].map((city) => (
+            <TouchableOpacity
+              key={city}
+              style={[styles.filterChip, selectedCity === city && styles.filterChipActive]}
+              onPress={() => setSelectedCity(selectedCity === city ? '' : city)}
+            >
+              <Text style={[styles.filterChipText, selectedCity === city && styles.filterChipTextActive]}>
+                📍 {city}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Finding nearby fixers...</Text>
+          <Text style={styles.loadingText}>Searching verified fixers...</Text>
         </View>
       ) : viewMode === 'map' ? (
-        /* Map Preview Mode */
+        /* Map Preview View */
         <View style={styles.mapContainer}>
-          {/* Interactive Map Visual Grid */}
           <View style={styles.mapCanvas}>
-            {/* Street Grid background lines */}
+            {/* Street Grid Lines */}
             <View style={styles.mapGridRoad1} />
             <View style={styles.mapGridRoad2} />
             <View style={styles.mapGridRoad3} />
             <View style={styles.mapGridRoad4} />
 
-            {/* Render Fixer Location Pins */}
+            {/* Plotted Fixer Pins */}
             {(fixers || []).map((fixer, index) => {
               const isSelected = selectedFixer?.id === fixer.id;
-              // Deterministic spread of pins across the canvas based on index/id
               const leftPos = `${15 + (index * 27) % 65}%` as any;
               const topPos = `${15 + (index * 33) % 55}%` as any;
 
@@ -272,9 +303,9 @@ export function FixerSearchScreen({ navigation }: any) {
               );
             })}
 
-            {fixers.length === 0 && (
+            {(fixers || []).length === 0 && (
               <View style={styles.mapEmptyNotice}>
-                <Text style={styles.mapEmptyText}>No fixers found in this area on map</Text>
+                <Text style={styles.mapEmptyText}>No fixers found matching your search.</Text>
               </View>
             )}
           </View>
@@ -285,7 +316,7 @@ export function FixerSearchScreen({ navigation }: any) {
               <View style={styles.floatingTop}>
                 <View style={styles.floatingAvatar}>
                   <Text style={styles.floatingAvatarText}>
-                    {(selectedFixer.companyName || selectedFixer.ownerName).charAt(0).toUpperCase()}
+                    {(selectedFixer.companyName || selectedFixer.ownerName || 'F')[0].toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.floatingInfo}>
@@ -297,22 +328,15 @@ export function FixerSearchScreen({ navigation }: any) {
                       <Text style={styles.verifiedText}>✓ Verified</Text>
                     </View>
                   </View>
-                  <Text style={styles.floatingSub}>
-                    {selectedFixer.ownerName} · 📍 {selectedFixer.city || 'City'} {selectedFixer.pincode ? `(${selectedFixer.pincode})` : ''}
-                  </Text>
-                  <Text style={styles.floatingRating}>
-                    {renderStars(Number(selectedFixer.averageRating))} {Number(selectedFixer.averageRating || 0).toFixed(1)} ({selectedFixer.totalReviews || 0} reviews)
-                  </Text>
+                  <Text style={styles.floatingSub}>📍 {selectedFixer.city} · {selectedFixer.completedJobs || 0} jobs</Text>
+                  <Text style={styles.floatingRating}>★ {Number(selectedFixer.averageRating || 5).toFixed(1)} ({selectedFixer.totalReviews || 0} reviews)</Text>
                 </View>
               </View>
 
               <View style={styles.floatingActions}>
                 <TouchableOpacity
                   style={styles.navActionBtn}
-                  onPress={() => {
-                    const addr = [selectedFixer.addressLine, selectedFixer.city, selectedFixer.pincode].filter(Boolean).join(', ');
-                    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr || selectedFixer.city)}`);
-                  }}
+                  onPress={() => openDirections(selectedFixer)}
                 >
                   <Text style={styles.navActionBtnText}>🗺️ Directions</Text>
                 </TouchableOpacity>
@@ -328,26 +352,20 @@ export function FixerSearchScreen({ navigation }: any) {
           )}
         </View>
       ) : (
-        /* List View Mode */
+        /* List Mode */
         <FlatList
           data={fixers}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          renderItem={renderFixerCard}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
-            searched ? (
-              <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>🔍</Text>
-                <Text style={styles.emptyTitle}>No fixers found</Text>
-                <Text style={styles.emptyText}>Try searching with a different pincode, city, or name</Text>
-              </View>
-            ) : (
-              <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>🔧</Text>
-                <Text style={styles.emptyTitle}>Search for fixers</Text>
-                <Text style={styles.emptyText}>Enter your city, area, or pincode to find verified repair pros</Text>
-              </View>
-            )
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>🔍</Text>
+              <Text style={styles.emptyTitle}>No Fixers Found</Text>
+              <Text style={styles.emptyText}>
+                Try adjusting your search keywords, city, or remove filters.
+              </Text>
+            </View>
           }
         />
       )}
@@ -359,24 +377,60 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: Spacing.sm, color: Colors.muted, fontSize: FontSize.sm },
+
   header: {
     backgroundColor: Colors.white,
     paddingHorizontal: Spacing.base,
     paddingTop: Spacing.xl + 10,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
-  title: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
-  subtitle: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: Spacing.sm, marginTop: 2 },
-  searchRow: { marginBottom: Spacing.xs },
-  searchInput: { marginBottom: 0 },
-  filterBar: { marginTop: Spacing.xs },
-  chipsContainer: { paddingVertical: Spacing.xs, gap: Spacing.xs },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  subtitle: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
+
+  searchBar: { marginBottom: Spacing.xs },
+
+  toggleRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: BorderRadius.full,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  toggleBtn: {
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  toggleBtnActive: {
+    backgroundColor: Colors.accent,
+  },
+  toggleBtnText: {
+    fontSize: 11,
+    color: Colors.muted,
+    fontWeight: FontWeight.semibold,
+  },
+  toggleBtnTextActive: {
+    color: Colors.white,
+    fontWeight: FontWeight.bold,
+  },
+
+  chipsContainer: {
+    paddingVertical: Spacing.xs,
+    gap: Spacing.xs,
+  },
   filterChip: {
     backgroundColor: Colors.bg,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     borderColor: Colors.borderLight,
@@ -386,93 +440,132 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentSoft,
     borderColor: Colors.accent,
   },
-  filterChipText: { fontSize: FontSize.xs, color: Colors.text, fontWeight: FontWeight.medium },
+  filterChipText: { fontSize: 11, color: Colors.text, fontWeight: FontWeight.medium },
   filterChipTextActive: { color: Colors.accent, fontWeight: FontWeight.bold },
-  toggleRow: {
-    flexDirection: 'row',
-    backgroundColor: Colors.bg,
-    borderRadius: BorderRadius.full,
-    padding: 3,
-    marginTop: Spacing.xs,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  toggleBtn: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-  },
-  toggleBtnActive: {
-    backgroundColor: Colors.accent,
-  },
-  toggleBtnText: {
-    fontSize: FontSize.xs,
-    color: Colors.muted,
-    fontWeight: FontWeight.semibold,
-  },
-  toggleBtnTextActive: {
-    color: Colors.white,
-    fontWeight: FontWeight.bold,
-  },
+
   list: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
+
   card: {
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.base,
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  cardTop: { flexDirection: 'row', marginBottom: Spacing.sm },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start' },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.full,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: Colors.accentSoft,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.md,
+    marginRight: Spacing.sm + 2,
   },
-  avatarText: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.accent },
+  avatarText: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.accent },
   info: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   name: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, flex: 1 },
   verifiedBadge: {
     backgroundColor: '#DCFCE7',
-    paddingHorizontal: Spacing.xs,
+    paddingHorizontal: Spacing.xs + 2,
     paddingVertical: 2,
     borderRadius: 4,
     marginLeft: Spacing.xs,
   },
   verifiedText: { color: '#15803D', fontSize: 10, fontWeight: FontWeight.bold },
-  owner: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  stars: { fontSize: FontSize.xs, color: Colors.warning, marginRight: Spacing.xs },
-  ratingText: { fontSize: FontSize.xs, color: Colors.muted },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.sm },
-  tag: { backgroundColor: '#F3F4F6', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: 4 },
-  tagText: { fontSize: 11, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  cardFooter: {
+  ownerText: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+
+  metaBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 2,
+  },
+  ratingStar: { fontSize: 11, color: '#D97706' },
+  ratingScore: { fontSize: 11, fontWeight: FontWeight.bold, color: '#92400E' },
+  reviewCount: { fontSize: 10, color: '#B45309' },
+
+  highlightBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  highlightText: { fontSize: 10, color: Colors.text, fontWeight: FontWeight.medium },
+
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  tag: {
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  tagText: { fontSize: 11, color: Colors.text, fontWeight: FontWeight.medium },
+
+  emergencyBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 4,
+    paddingHorizontal: Spacing.sm,
+    marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  emergencyBannerText: { fontSize: 11, fontWeight: FontWeight.bold, color: '#B45309' },
+
+  cardFooter: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
     paddingTop: Spacing.sm,
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
   },
-  statsRow: { flexDirection: 'row', gap: Spacing.md },
-  stat: { alignItems: 'center' },
-  statValue: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text },
-  statLabel: { fontSize: 10, color: Colors.muted },
-  emergencyBadge: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.full,
+  directionsBtn: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  emergencyText: { fontSize: 10, fontWeight: FontWeight.bold, color: '#B45309' },
+  directionsBtnText: { color: Colors.text, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  viewProfileBtn: {
+    flex: 2,
+    backgroundColor: Colors.accent,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewProfileBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+
   mapContainer: { flex: 1, position: 'relative' },
   mapCanvas: {
     flex: 1,
@@ -522,6 +615,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mapEmptyText: { color: Colors.muted, fontSize: FontSize.sm },
+
   floatingCard: {
     position: 'absolute',
     bottom: Spacing.md,
@@ -552,7 +646,7 @@ const styles = StyleSheet.create({
   floatingInfo: { flex: 1 },
   floatingName: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, flex: 1 },
   floatingSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
-  floatingRating: { fontSize: FontSize.xs, color: Colors.warning, marginTop: 2, fontWeight: FontWeight.semibold },
+  floatingRating: { fontSize: FontSize.xs, color: '#D97706', marginTop: 2, fontWeight: FontWeight.semibold },
   floatingActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs },
   navActionBtn: {
     flex: 1,
@@ -561,10 +655,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   navActionBtnText: { color: Colors.text, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   profileActionBtn: {
-    flex: 1.4,
+    flex: 1.5,
     backgroundColor: Colors.accent,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
@@ -572,6 +668,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileActionBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+
   empty: { alignItems: 'center', paddingTop: Spacing.xxxl },
   emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
   emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: Spacing.xs },
