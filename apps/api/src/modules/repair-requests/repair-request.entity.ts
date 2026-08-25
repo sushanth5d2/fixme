@@ -129,12 +129,6 @@ export class RepairRequestEntity {
   @Column({ name: 'preferred_time', type: 'time', nullable: true })
   preferredTime!: string | null;
 
-  @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })
-  cancelledAt!: Date | null;
-
-  @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
-  cancellationReason!: string | null;
-
   @OneToMany(() => RepairRequestMediaEntity, (m) => m.request)
   media!: RepairRequestMediaEntity[];
 

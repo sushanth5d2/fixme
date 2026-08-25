@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
@@ -422,6 +423,49 @@ export function CreateRequestScreen({ route, navigation }: Props) {
               containerStyle={styles.halfInput}
             />
           </View>
+
+          {/* Visual Location Map Preview */}
+          <View style={styles.mapPreviewCard}>
+            <View style={styles.mapPreviewHeader}>
+              <Text style={styles.mapPreviewTitle}>🗺️ Location Map View</Text>
+              <TouchableOpacity
+                style={styles.mapLaunchBtn}
+                onPress={() => {
+                  if (latitude && longitude) {
+                    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
+                  } else {
+                    const q = [houseBuilding, street, area, landmark, city, pincode].filter(Boolean).join(', ');
+                    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q || 'Bengaluru')}`);
+                  }
+                }}
+              >
+                <Text style={styles.mapLaunchBtnText}>Open in Google Maps ↗</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.mapVisualContainer}>
+              <View style={styles.mapTileBackground}>
+                <View style={styles.mapRoadH} />
+                <View style={styles.mapRoadV} />
+                <View style={styles.mapPinBadge}>
+                  <Text style={styles.mapPinIcon}>📍</Text>
+                  <Text style={styles.mapPinText} numberOfLines={1}>
+                    {area || city || 'Service Area Pinpoint'}
+                  </Text>
+                </View>
+              </View>
+
+              {latitude && longitude ? (
+                <Text style={styles.gpsCoordText}>
+                  📍 GPS Pin: {Number(latitude).toFixed(4)}° N, {Number(longitude).toFixed(4)}° E
+                </Text>
+              ) : (
+                <Text style={styles.gpsCoordText}>
+                  📍 {area || city ? `${area ? area + ', ' : ''}${city || ''} (${pincode || ''})` : 'Location pinpoint will show on technician navigation'}
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
 
         {/* Section 4: Schedule (Optional) */}
@@ -682,5 +726,102 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: FontWeight.medium,
     lineHeight: 18,
+  },
+
+  // Map Preview Styles
+  mapPreviewCard: {
+    marginTop: Spacing.md,
+    backgroundColor: Colors.bg,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  mapPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  mapPreviewTitle: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+  mapLaunchBtn: {
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
+  },
+  mapLaunchBtnText: {
+    fontSize: 11,
+    fontWeight: FontWeight.semibold,
+    color: Colors.accent,
+  },
+  mapVisualContainer: {
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  mapTileBackground: {
+    height: 100,
+    backgroundColor: '#E8ECEF',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapRoadH: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 14,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#D0D7DE',
+  },
+  mapRoadV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 14,
+    backgroundColor: '#FFFFFF',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#D0D7DE',
+  },
+  mapPinBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 4,
+    maxWidth: '85%',
+  },
+  mapPinIcon: { fontSize: 16 },
+  mapPinText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+  gpsCoordText: {
+    backgroundColor: Colors.white,
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.sm,
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontWeight: FontWeight.medium,
   },
 });

@@ -267,8 +267,6 @@ export class RepairRequestsService {
     }
 
     request.status = RequestStatus.CANCELLED;
-    request.cancelledAt = new Date();
-    request.cancellationReason = dto.reason ?? null;
     await this.requestRepo.save(request);
 
     this.logger.log(`Repair request cancelled: ${requestId}`);

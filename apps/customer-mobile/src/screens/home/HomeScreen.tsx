@@ -17,12 +17,17 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'Home'>;
 
 const CATEGORY_ICONS: Record<string, string> = {
   phone: '📱',
+  'mobile-phone': '📱',
   laptop: '💻',
+  'desktop-pc': '🖥️',
   tv: '📺',
+  television: '📺',
   ac: '❄️',
+  'air-conditioner': '❄️',
   'washing-machine': '🫧',
   refrigerator: '🧊',
   microwave: '🍳',
+  'water-purifier': '💧',
   plumbing: '🚰',
   mechanical: '🚗',
   electrical: '⚡',
@@ -47,13 +52,14 @@ interface MyRequest {
 }
 
 const FALLBACK_CATEGORIES: Category[] = [
-  { id: 'phone', name: 'Mobile / Smartphone', slug: 'phone' },
+  { id: 'phone', name: 'Mobile Phone', slug: 'phone' },
   { id: 'laptop', name: 'Laptop / PC', slug: 'laptop' },
   { id: 'tv', name: 'Television (TV)', slug: 'tv' },
-  { id: 'ac', name: 'Air Conditioner (AC)', slug: 'ac' },
+  { id: 'ac', name: 'Air Conditioner', slug: 'ac' },
   { id: 'washing-machine', name: 'Washing Machine', slug: 'washing-machine' },
   { id: 'refrigerator', name: 'Refrigerator', slug: 'refrigerator' },
   { id: 'microwave', name: 'Microwave & Oven', slug: 'microwave' },
+  { id: 'water-purifier', name: 'Water Purifier', slug: 'water-purifier' },
   { id: 'plumbing', name: 'Plumbing Services', slug: 'plumbing' },
   { id: 'mechanical', name: 'Mechanical & Auto', slug: 'mechanical' },
   { id: 'electrical', name: 'Electrical & Wiring', slug: 'electrical' },
@@ -73,10 +79,21 @@ export function HomeScreen({ navigation }: Props) {
         api.get('/categories').catch(() => null),
         api.get('/repair-requests/mine?limit=3').catch(() => null),
       ]);
-      if (catRes?.data?.data?.length) {
-        setCategories(catRes.data.data);
-      } else if (Array.isArray(catRes?.data) && catRes.data.length) {
-        setCategories(catRes.data);
+      const rawCats = catRes?.data?.data || (Array.isArray(catRes?.data) ? catRes.data : []);
+      if (rawCats.length > 0) {
+        // Deduplicate
+        const seen = new Set<string>();
+        const uniqueCats: Category[] = [];
+        for (const cat of rawCats) {
+          const key = cat.slug.toLowerCase().replace(/[^a-z]/g, '');
+          const nameKey = cat.name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 5);
+          if (!seen.has(key) && !seen.has(nameKey)) {
+            seen.add(key);
+            seen.add(nameKey);
+            uniqueCats.push(cat);
+          }
+        }
+        setCategories(uniqueCats);
       }
       if (reqRes?.data?.data) {
         setRecentRequests(reqRes.data.data);

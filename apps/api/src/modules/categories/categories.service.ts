@@ -35,33 +35,55 @@ export class CategoriesService implements OnModuleInit {
 
   public async onModuleInit(): Promise<void> {
     try {
-      this.logger.log('Syncing default service categories...');
+      this.logger.log('Syncing and deduplicating service categories...');
+      // Deactivate redundant duplicate slugs
+      await this.categoryRepo
+        .createQueryBuilder()
+        .update(DeviceCategoryEntity)
+        .set({ isActive: false })
+        .where("slug IN ('mobile-phone', 'air-conditioner', 'desktop-pc')")
+        .execute()
+        .catch(() => {});
+
+      // Ensure each standard category exists and is active
       for (const cat of DEFAULT_CATEGORIES) {
         const existing = await this.categoryRepo.findOne({ where: { slug: cat.slug } });
         if (!existing) {
           await this.categoryRepo.save(this.categoryRepo.create({ ...cat, isActive: true }));
+        } else if (!existing.isActive || existing.name !== cat.name) {
+          existing.isActive = true;
+          existing.name = cat.name;
+          existing.sortOrder = cat.sortOrder;
+          await this.categoryRepo.save(existing);
         }
       }
-      this.logger.log(`Service categories synced successfully.`);
+      this.logger.log(`Service categories synced without duplicates.`);
     } catch (err) {
       this.logger.warn(`Could not auto-seed categories: ${err}`);
     }
   }
 
   public async findAll(): Promise<DeviceCategoryEntity[]> {
-    for (const cat of DEFAULT_CATEGORIES) {
-      try {
-        const existing = await this.categoryRepo.findOne({ where: { slug: cat.slug } });
-        if (!existing) {
-          await this.categoryRepo.save(this.categoryRepo.create({ ...cat, isActive: true }));
-        }
-      } catch {}
-    }
-
-    return this.categoryRepo.find({
+    const list = await this.categoryRepo.find({
       where: { isActive: true },
       order: { sortOrder: 'ASC', name: 'ASC' },
     });
+
+    // Deduplicate by name/slug if any duplicates exist in database
+    const seen = new Set<string>();
+    const unique: DeviceCategoryEntity[] = [];
+
+    for (const item of list) {
+      const key = item.slug.toLowerCase().replace(/[^a-z]/g, '');
+      const normalizedName = item.name.toLowerCase().replace(/[^a-z]/g, '');
+      if (!seen.has(key) && !seen.has(normalizedName)) {
+        seen.add(key);
+        seen.add(normalizedName);
+        unique.push(item);
+      }
+    }
+
+    return unique;
   }
 
   public async findById(id: string): Promise<DeviceCategoryEntity> {
