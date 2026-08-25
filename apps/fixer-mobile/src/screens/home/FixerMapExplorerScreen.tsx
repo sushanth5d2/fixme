@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Input } from '../../components/ui';
+import { InteractiveMapView, MapMarker } from '../../components/ui/InteractiveMapView';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
@@ -170,6 +171,32 @@ export function FixerMapExplorerScreen({ navigation }: any) {
     return key ? CATEGORY_ICONS[key] : CATEGORY_ICONS.default;
   };
 
+  const mapMarkers: MapMarker[] = React.useMemo(() => {
+    return requests.map((req, index) => {
+      const urgencyKey = req.urgency || req.priority || 'MEDIUM';
+      const urgency = URGENCY_STYLES[urgencyKey] || URGENCY_STYLES.MEDIUM;
+
+      // Realistic GPS fallback centered on city if coordinates not set
+      const baseLat = 12.9716;
+      const baseLng = 77.5946;
+      const lat = req.latitude || (baseLat + (((index * 3) % 7) - 3) * 0.015);
+      const lng = req.longitude || (baseLng + (((index * 4) % 7) - 3) * 0.015);
+
+      return {
+        id: req.id,
+        latitude: lat,
+        longitude: lng,
+        title: req.area || req.city || 'Customer',
+        icon: getCategoryIcon(req.category?.name),
+        badge: urgency.label,
+        badgeBg: urgency.bg,
+        badgeColor: urgency.color,
+        urgency: urgencyKey,
+        data: req,
+      };
+    });
+  }, [requests]);
+
   const renderRequestItem = ({ item }: { item: RepairRequest }) => {
     const urgencyKey = item.urgency || item.priority || 'MEDIUM';
     const urgency = URGENCY_STYLES[urgencyKey] || URGENCY_STYLES.MEDIUM;
@@ -321,93 +348,13 @@ export function FixerMapExplorerScreen({ navigation }: any) {
       ) : viewMode === 'map' ? (
         /* Visual Interactive Map Canvas */
         <View style={styles.mapContainer}>
-          <ScrollView
-            maximumZoomScale={2.5}
-            minimumZoomScale={0.5}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.mapScrollContent}
-          >
-            <View style={[styles.mapCanvas, { transform: [{ scale: zoomLevel }] }]}>
-              {/* Map Grid Roads */}
-              <View style={styles.roadH1} />
-              <View style={styles.roadH2} />
-              <View style={styles.roadV1} />
-              <View style={styles.roadV2} />
-
-              {/* Plotted Customer Request Location Markers */}
-              {(requests || []).map((req, index) => {
-                const isSelected = selectedRequest?.id === req.id;
-                const urgencyKey = req.urgency || req.priority || 'MEDIUM';
-                const urgency = URGENCY_STYLES[urgencyKey] || URGENCY_STYLES.MEDIUM;
-
-                // Scatter markers across the map surface
-                const leftPos = `${12 + (index * 29) % 72}%` as any;
-                const topPos = `${10 + (index * 24) % 65}%` as any;
-
-                return (
-                  <TouchableOpacity
-                    key={req.id || index}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.mapMarker,
-                      { left: leftPos, top: topPos, borderColor: urgency.border },
-                      isSelected && styles.mapMarkerSelected,
-                    ]}
-                    onPress={() => setSelectedRequest(req)}
-                  >
-                    <Text style={styles.markerIcon}>{getCategoryIcon(req.category?.name)}</Text>
-                    <View style={styles.markerInfo}>
-                      <Text style={styles.markerTitle} numberOfLines={1}>
-                        {req.area || req.city || 'Customer'}
-                      </Text>
-                      <Text style={[styles.markerUrgency, { color: urgency.color }]}>
-                        {urgency.label}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-
-              {(requests || []).length === 0 && (
-                <View style={styles.emptyMapNotice}>
-                  <Text style={styles.emptyMapTitle}>No customer requests match your filter</Text>
-                  <Text style={styles.emptyMapSub}>Try clearing filters or searching another city/pincode</Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-
-          {/* Floating Zoom Control HUD */}
-          <View style={styles.zoomControlsHud}>
-            <TouchableOpacity
-              style={styles.zoomBtn}
-              onPress={handleZoomIn}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.zoomBtnText}>＋</Text>
-            </TouchableOpacity>
-
-            <View style={styles.zoomLevelBadge}>
-              <Text style={styles.zoomLevelText}>{Math.round(zoomLevel * 100)}%</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.zoomBtn}
-              onPress={handleZoomOut}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.zoomBtnText}>－</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.resetZoomBtn}
-              onPress={handleResetZoom}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.resetZoomText}>🎯</Text>
-            </TouchableOpacity>
-          </View>
+          <InteractiveMapView
+            markers={mapMarkers}
+            selectedMarkerId={selectedRequest?.id}
+            onMarkerPress={(marker) => setSelectedRequest(marker.data)}
+            style={styles.flexMap}
+            showNavigationButton={false}
+          />
 
           {/* Floating Selected Request Detail Card */}
           {selectedRequest && (
@@ -554,7 +501,8 @@ const styles = StyleSheet.create({
   chipText: { fontSize: FontSize.xs, color: Colors.text, fontWeight: FontWeight.medium },
   chipTextActive: { color: Colors.accent, fontWeight: FontWeight.bold },
   chipTextEmergencyActive: { color: '#DC2626', fontWeight: FontWeight.bold },
-  mapContainer: { flex: 1, position: 'relative' },
+  mapContainer: { flex: 1, position: 'relative', overflow: 'hidden' },
+  flexMap: { flex: 1, width: '100%', height: '100%' },
   mapScrollContent: { flexGrow: 1, minHeight: '100%' },
   mapCanvas: {
     flex: 1,

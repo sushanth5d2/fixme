@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Button } from '../../components/ui';
+import { InteractiveMapView } from '../../components/ui/InteractiveMapView';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
@@ -368,6 +369,28 @@ export function RequestDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           </View>
           <Text style={styles.addressText}>{fullAddress}</Text>
+
+          {request.latitude && request.longitude ? (
+            <View style={styles.inlineMapContainer}>
+              <InteractiveMapView
+                markers={[
+                  {
+                    id: request.id,
+                    latitude: request.latitude,
+                    longitude: request.longitude,
+                    title: request.area || 'Service Location',
+                    icon: '📍',
+                    badge: 'My Location',
+                  },
+                ]}
+                centerLat={request.latitude}
+                centerLng={request.longitude}
+                initialZoom={15}
+                style={styles.inlineMap}
+                showNavigationButton={true}
+              />
+            </View>
+          ) : null}
         </View>
 
         {/* Quotes Section */}
@@ -678,4 +701,18 @@ const styles = StyleSheet.create({
   callNowText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   closePopupBtn: { alignItems: 'center', paddingVertical: Spacing.sm },
   closePopupText: { fontSize: FontSize.sm, color: Colors.muted, fontWeight: FontWeight.semibold },
+
+  inlineMapContainer: {
+    height: 180,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  inlineMap: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
 });

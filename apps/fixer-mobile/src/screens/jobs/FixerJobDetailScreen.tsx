@@ -12,6 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Button, Input } from '../../components/ui';
+import { InteractiveMapView } from '../../components/ui/InteractiveMapView';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { useAuthStore } from '../../stores/auth.store';
 import { api } from '../../services/api';
@@ -397,6 +398,28 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           </View>
           <Text style={styles.infoText}>{fullAddress}</Text>
+
+          {job.request?.latitude && job.request?.longitude ? (
+            <View style={styles.inlineMapContainer}>
+              <InteractiveMapView
+                markers={[
+                  {
+                    id: job.id,
+                    latitude: job.request.latitude,
+                    longitude: job.request.longitude,
+                    title: job.request.area || 'Customer',
+                    icon: '📍',
+                    badge: 'Customer',
+                  },
+                ]}
+                centerLat={job.request.latitude}
+                centerLng={job.request.longitude}
+                initialZoom={15}
+                style={styles.inlineMap}
+                showNavigationButton={true}
+              />
+            </View>
+          ) : null}
         </View>
 
         {/* Quote Details & Revision Button */}
@@ -783,4 +806,18 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   popupSaveText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+
+  inlineMapContainer: {
+    height: 180,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  inlineMap: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
 });
