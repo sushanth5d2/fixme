@@ -95,11 +95,15 @@ export function RequestDetailScreen({ route, navigation }: any) {
         api.get(`/quotes/request/${requestId}`).catch(() => ({ data: { data: [] } })),
         api.get('/jobs/mine/customer').catch(() => ({ data: { data: [] } })),
       ]);
-      setRequest(reqRes.data.data || reqRes.data);
-      setQuotes(quotesRes.data.data || quotesRes.data || []);
+      const rawReq = reqRes?.data?.data || reqRes?.data;
+      setRequest(rawReq);
 
-      const jobsList = jobsRes.data.data || jobsRes.data || [];
-      const matchingJob = jobsList.find((j: any) => j.requestId === requestId || j.request?.id === requestId);
+      const rawQuotes = quotesRes?.data?.data?.data || quotesRes?.data?.data || quotesRes?.data || [];
+      setQuotes(Array.isArray(rawQuotes) ? rawQuotes : []);
+
+      const rawJobs = jobsRes?.data?.data?.data || jobsRes?.data?.data || jobsRes?.data || [];
+      const jobsList = Array.isArray(rawJobs) ? rawJobs : [];
+      const matchingJob = jobsList.find((j: any) => j?.requestId === requestId || j?.request?.id === requestId);
       if (matchingJob) {
         setJob(matchingJob);
       }
