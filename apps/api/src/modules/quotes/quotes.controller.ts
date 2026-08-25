@@ -71,6 +71,17 @@ export class QuotesController {
     return this.quotesService.getQuotesForRequest(requestId);
   }
 
+  @Get('request/:requestId/mine')
+  @Roles(UserRole.FIXER)
+  @ApiOperation({ summary: '[Fixer] Get my submitted quote for a repair request' })
+  @ApiParam({ name: 'requestId', type: 'string', format: 'uuid' })
+  public getMyQuoteForRequest(
+    @CurrentUser('sub') userId: string,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+  ) {
+    return this.quotesService.getMyQuoteForRequest(userId, requestId);
+  }
+
   @Get('mine')
   @Roles(UserRole.FIXER)
   @ApiOperation({ summary: '[Fixer] List my submitted quotes' })

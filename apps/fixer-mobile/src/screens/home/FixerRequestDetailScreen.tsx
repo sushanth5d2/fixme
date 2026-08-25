@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
@@ -53,24 +54,39 @@ const URGENCY_CONFIG: Record<string, { label: string; color: string; bg: string 
 export function FixerRequestDetailScreen({ route, navigation }: any) {
   const { requestId } = route.params;
   const [request, setRequest] = useState<RequestDetail | null>(null);
+  const [myQuote, setMyQuote] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [startingChat, setStartingChat] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchDetail = async () => {
-      try {
-        const { data } = await api.get(`/repair-requests/feed/${requestId}`);
-        const r = data?.data || data;
-        if (r) setRequest(r);
-      } catch (err) {
-        console.error('[Fetch Fixer Request Detail Error]', err);
-      } finally {
-        setLoading(false);
+  const fetchDetail = useCallback(async () => {
+    try {
+      const [reqRes, quoteRes] = await Promise.all([
+        api.get(`/repair-requests/feed/${requestId}`).catch(() => null),
+        api.get(`/quotes/request/${requestId}/mine`).catch(() => null),
+      ]);
+
+      const r = reqRes?.data?.data || reqRes?.data;
+      if (r) setRequest(r);
+
+      const q = quoteRes?.data?.data || quoteRes?.data;
+      if (q && q.id && q.status !== 'WITHDRAWN') {
+        setMyQuote(q);
+      } else {
+        setMyQuote(null);
       }
-    };
-    fetchDetail();
+    } catch (err) {
+      console.error('[Fetch Fixer Request Detail Error]', err);
+    } finally {
+      setLoading(false);
+    }
   }, [requestId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+    }, [fetchDetail]),
+  );
 
   const handleStartChat = async () => {
     if (!request) return;
@@ -162,6 +178,27 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
             })}
           </Text>
         </View>
+
+        {/* Existing Quote Banner if Submitted */}
+        {myQuote && (
+          <View style={styles.myQuoteCard}>
+            <View style={styles.myQuoteHeader}>
+              <Text style={styles.myQuoteTitle}>✅ Your Submitted Quote</Text>
+              <View style={styles.myQuoteBadge}>
+                <Text style={styles.myQuoteBadgeText}>{myQuote.status}</Text>
+              </View>
+            </View>
+            <Text style={styles.myQuoteAmount}>
+              ₹{Number(myQuote.estimatedTotal || myQuote.amount || 0).toLocaleString('en-IN')}
+            </Text>
+            {myQuote.notes ? (
+              <Text style={styles.myQuoteNotes}>Notes: {myQuote.notes}</Text>
+            ) : null}
+            <Text style={styles.myQuoteSub}>
+              Warranty: {myQuote.warrantyDays || 0} days · Tap below to edit
+            </Text>
+          </View>
+        )}
 
         {/* Customer Preferred Time */}
         {(request.preferredDate || request.preferredTime) && (
@@ -272,7 +309,7 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
         </SafeAreaView>
       </Modal>
 
-      {/* Dual Floating Bottom Actions: Chat with Customer & Send Quote */}
+      {/* Dual Floating Bottom Actions: Chat with Customer & Send / Edit Quote */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.chatActionBtn}
@@ -288,14 +325,17 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.quoteActionBtn}
+          style={[styles.quoteActionBtn, myQuote && styles.quoteActionBtnEdit]}
           activeOpacity={0.8}
           onPress={() => navigation.navigate('SubmitQuote', {
             requestId: request.id,
             categoryName: request.category?.name,
+            existingQuote: myQuote,
           })}
         >
-          <Text style={styles.quoteActionText}>Send Quote 💼</Text>
+          <Text style={styles.quoteActionText}>
+            {myQuote ? 'Edit Quote ✏️' : 'Send Quote 💼'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -327,6 +367,21 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.muted, textTransform: 'uppercase', marginTop: Spacing.sm, marginBottom: 4 },
   descText: { fontSize: FontSize.base, color: Colors.text, lineHeight: 22, marginBottom: Spacing.sm },
   postedDate: { fontSize: FontSize.xs, color: Colors.muted, borderTopWidth: 1, borderTopColor: Colors.borderLight, paddingTop: Spacing.xs, marginTop: Spacing.xs },
+  myQuoteCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+  },
+  myQuoteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs },
+  myQuoteTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#166534' },
+  myQuoteBadge: { backgroundColor: '#DCFCE7', paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
+  myQuoteBadgeText: { fontSize: 10, fontWeight: FontWeight.bold, color: '#15803D' },
+  myQuoteAmount: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: '#166534', marginVertical: 2 },
+  myQuoteNotes: { fontSize: FontSize.xs, color: '#15803D', marginTop: 2 },
+  myQuoteSub: { fontSize: 11, color: '#166534', opacity: 0.8, marginTop: 4 },
   cardTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.xs },
   scheduleText: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
   photoRow: { marginTop: Spacing.xs },
@@ -379,35 +434,6 @@ const styles = StyleSheet.create({
   mapPinText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.text },
   addressText: { fontSize: FontSize.sm, color: Colors.text, marginTop: Spacing.xs, lineHeight: 20 },
   gpsText: { fontSize: 11, color: Colors.muted, marginTop: 2, fontWeight: FontWeight.medium },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-  },
-  modalTitle: { color: Colors.white, fontSize: FontSize.base, fontWeight: FontWeight.semibold },
-  modalCloseBtn: {
-    backgroundColor: '#374151',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-  },
-  modalCloseText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
-  modalImageContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.base,
-  },
-  modalImage: {
-    width: '100%',
-    height: '100%',
-  },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -449,9 +475,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  quoteActionBtnEdit: {
+    backgroundColor: '#059669', // Emerald green for edit mode
+  },
   quoteActionText: {
     color: Colors.white,
     fontSize: FontSize.base,
     fontWeight: FontWeight.bold,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm,
+  },
+  modalTitle: { color: Colors.white, fontSize: FontSize.base, fontWeight: FontWeight.semibold },
+  modalCloseBtn: {
+    backgroundColor: '#374151',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+  },
+  modalCloseText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  modalImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.base,
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
   },
 });

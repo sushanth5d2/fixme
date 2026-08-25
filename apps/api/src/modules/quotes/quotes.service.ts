@@ -48,13 +48,28 @@ export class QuotesService {
     const existingQuote = await this.quoteRepo.findOne({
       where: { requestId: dto.requestId, fixerId: fixer.id },
     });
-    if (existingQuote && existingQuote.status !== QuoteStatus.WITHDRAWN) {
-      throw new ConflictException('You have already submitted a quote for this request');
-    }
 
     const totalAmount = Number((dto as any).amount ?? (dto as any).estimatedTotal ?? 0);
     const durationDays = (dto as any).estimatedCompletionDays ?? ((dto as any).estimatedDurationHours ? Math.max(1, Math.ceil((dto as any).estimatedDurationHours / 24)) : 1);
     const notesText = (dto as any).diagnosisNotes ?? (dto as any).notes ?? null;
+    const validUntilDate = new Date();
+    validUntilDate.setDate(validUntilDate.getDate() + 7);
+    const validUntilStr = validUntilDate.toISOString().split('T')[0];
+
+    if (existingQuote && existingQuote.status !== QuoteStatus.WITHDRAWN) {
+      if (existingQuote.status === QuoteStatus.SUBMITTED || existingQuote.status === QuoteStatus.VIEWED) {
+        existingQuote.estimatedTotal = totalAmount;
+        existingQuote.notes = notesText;
+        existingQuote.estimatedCompletionDays = durationDays;
+        existingQuote.warrantyDays = Number(dto.warrantyDays ?? 0);
+        existingQuote.validUntil = validUntilStr;
+        existingQuote.submittedAt = new Date();
+        const updated = await this.quoteRepo.save(existingQuote);
+        this.logger.log(`Quote ${updated.id} updated by fixer ${fixer.id} for request ${dto.requestId}`);
+        return updated;
+      }
+      throw new ConflictException('You have already submitted a quote for this request that was accepted or rejected');
+    }
 
     const quote = new QuoteEntity();
     quote.requestId = dto.requestId;
@@ -65,9 +80,7 @@ export class QuotesService {
     quote.warrantyDays = Number(dto.warrantyDays ?? 0);
     quote.status = QuoteStatus.SUBMITTED;
     quote.submittedAt = new Date();
-    const validUntilDate = new Date();
-    validUntilDate.setDate(validUntilDate.getDate() + 7);
-    quote.validUntil = validUntilDate.toISOString().split('T')[0];
+    quote.validUntil = validUntilStr;
 
     const saved = await this.quoteRepo.save(quote);
 
@@ -78,6 +91,19 @@ export class QuotesService {
 
     this.logger.log(`Quote ${saved.id} submitted by fixer ${fixer.id} for request ${dto.requestId}`);
     return saved;
+  }
+
+  public async getMyQuoteForRequest(
+    fixerUserId: string,
+    requestId: string,
+  ): Promise<QuoteEntity | null> {
+    const fixer = await this.fixerRepo.findOne({ where: { userId: fixerUserId } });
+    if (!fixer) return null;
+
+    const quote = await this.quoteRepo.findOne({
+      where: { requestId, fixerId: fixer.id },
+    });
+    return quote;
   }
 
   public async accept(
