@@ -8,10 +8,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { QuoteStatus, RequestStatus } from '@fixme/shared-types';
+import { QuoteStatus, RequestStatus, JobStatus } from '@fixme/shared-types';
 import { QuoteEntity } from './quote.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
+import { JobEntity } from '../jobs/job.entity';
+import { JobStatusHistoryEntity } from '../jobs/job-status-history.entity';
+import { ConversationEntity } from '../chat/conversation.entity';
 import { SubmitQuoteDto, AcceptQuoteDto } from './dto/quote.dto';
 
 @Injectable()
@@ -156,7 +159,36 @@ export class QuotesService {
         status: RequestStatus.CUSTOMER_ACCEPTED,
       });
 
-      this.logger.log(`Quote ${quoteId} accepted for request ${quote.requestId}`);
+      // Create Job for assigned fixer
+      const job = new JobEntity();
+      job.requestId = quote.requestId;
+      job.quoteId = quote.id;
+      job.fixerId = quote.fixerId;
+      job.customerId = request.customerId;
+      job.status = JobStatus.ASSIGNED;
+      job.agreedTotal = Number(quote.estimatedTotal ?? 0);
+      job.warrantyDays = Number(quote.warrantyDays ?? 0);
+      const savedJob = await manager.save(job);
+
+      // Record initial job status history
+      const history = manager.create(JobStatusHistoryEntity, {
+        jobId: savedJob.id,
+        fromStatus: null as any,
+        toStatus: JobStatus.ASSIGNED,
+        changedByUserId: customerUserId,
+        notes: 'Quote accepted by customer',
+      });
+      await manager.save(history);
+
+      // Link any conversation for this request to the new job
+      await manager
+        .createQueryBuilder()
+        .update(ConversationEntity)
+        .set({ jobId: savedJob.id })
+        .where('request_id = :requestId', { requestId: quote.requestId })
+        .execute();
+
+      this.logger.log(`Job ${savedJob.id} created for accepted quote ${quoteId}`);
       return quote;
     });
   }

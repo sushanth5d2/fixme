@@ -5,11 +5,21 @@ import { QuotesService } from './quotes.service';
 import { QuoteEntity } from './quote.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
+import { JobEntity } from '../jobs/job.entity';
+import { JobStatusHistoryEntity } from '../jobs/job-status-history.entity';
+import { ConversationEntity } from '../chat/conversation.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([QuoteEntity, RepairRequestEntity, FixerEntity]),
+    TypeOrmModule.forFeature([
+      QuoteEntity,
+      RepairRequestEntity,
+      FixerEntity,
+      JobEntity,
+      JobStatusHistoryEntity,
+      ConversationEntity,
+    ]),
     AuthModule,
   ],
   controllers: [QuotesController],

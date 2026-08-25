@@ -6,6 +6,7 @@ import {
   MainTabParamList,
   FeedStackParamList,
   MapStackParamList,
+  QuotesStackParamList,
   JobsStackParamList,
   ChatStackParamList,
   ProfileStackParamList,
@@ -57,6 +58,23 @@ function MapNavigator() {
         options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
       />
     </MapStack.Navigator>
+  );
+}
+
+// ── Quotes Stack ──
+const QuotesStack = createNativeStackNavigator<QuotesStackParamList>();
+function QuotesNavigator() {
+  return (
+    <QuotesStack.Navigator screenOptions={{ headerShadowVisible: false }}>
+      <QuotesStack.Screen name="QuotesList" component={MyQuotesScreen} options={{ headerShown: false }} />
+      <QuotesStack.Screen name="RequestDetail" component={FixerRequestDetailScreen} options={{ title: 'Request Details' }} />
+      <QuotesStack.Screen name="SubmitQuote" component={SubmitQuoteScreen} options={{ title: 'Send / Edit Quote' }} />
+      <QuotesStack.Screen
+        name="ChatRoom"
+        component={FixerChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
+      />
+    </QuotesStack.Navigator>
   );
 }
 
@@ -132,7 +150,7 @@ export function MainTabNavigator() {
       <Tab.Screen name="FeedTab" component={FeedNavigator} options={{ tabBarLabel: 'Feed' }} />
       <Tab.Screen name="MapTab" component={MapNavigator} options={{ tabBarLabel: 'Map' }} />
       <Tab.Screen name="MyJobsTab" component={JobsNavigator} options={{ tabBarLabel: 'My Jobs' }} />
-      <Tab.Screen name="MyQuotesTab" component={MyQuotesScreen} options={{ tabBarLabel: 'Quotes' }} />
+      <Tab.Screen name="MyQuotesTab" component={QuotesNavigator} options={{ tabBarLabel: 'Quotes' }} />
       <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ tabBarLabel: 'Chat' }} />
       <Tab.Screen name="ProfileTab" component={ProfileNavigator} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>

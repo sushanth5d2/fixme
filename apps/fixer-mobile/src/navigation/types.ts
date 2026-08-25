@@ -28,6 +28,13 @@ export type MapStackParamList = {
   ChatRoom: { conversationId: string; otherUserName: string };
 };
 
+export type QuotesStackParamList = {
+  QuotesList: undefined;
+  RequestDetail: { requestId: string };
+  SubmitQuote: { requestId: string; categoryName?: string; existingQuote?: any };
+  ChatRoom: { conversationId: string; otherUserName: string };
+};
+
 export type JobsStackParamList = {
   JobsList: undefined;
   JobDetail: { jobId: string };

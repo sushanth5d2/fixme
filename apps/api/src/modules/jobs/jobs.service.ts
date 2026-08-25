@@ -136,17 +136,26 @@ export class JobsService {
     page = 1,
     limit = 20,
   ): Promise<{ data: JobEntity[]; total: number }> {
-    const where = role === 'fixer'
-      ? { fixer: { userId } }
-      : { customer: { userId } };
+    const qb = this.jobRepo
+      .createQueryBuilder('job')
+      .leftJoinAndSelect('job.request', 'request')
+      .leftJoinAndSelect('request.category', 'category')
+      .leftJoinAndSelect('request.brand', 'brand')
+      .leftJoinAndSelect('job.fixer', 'fixer')
+      .leftJoinAndSelect('job.customer', 'customer')
+      .leftJoinAndSelect('job.quote', 'quote');
 
-    const [data, total] = await this.jobRepo.findAndCount({
-      where,
-      relations: ['request', 'request.category', 'fixer', 'customer', 'quote'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    if (role === 'fixer') {
+      qb.where('fixer.userId = :userId', { userId });
+    } else {
+      qb.where('customer.userId = :userId', { userId });
+    }
+
+    qb.orderBy('job.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
     return { data, total };
   }
 
