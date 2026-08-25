@@ -136,6 +136,8 @@ export class FixersService implements OnModuleInit {
         CREATE INDEX IF NOT EXISTS idx_fixer_members_user_id ON fixer_members(user_id);
 
         DO $$ BEGIN
+          ALTER TABLE fixers ALTER COLUMN profile_photo_key TYPE text;
+          ALTER TABLE fixers ADD COLUMN IF NOT EXISTS workshop_photos text[] DEFAULT '{}';
           ALTER TABLE jobs ADD COLUMN IF NOT EXISTS assigned_member_id UUID REFERENCES fixer_members(id) ON DELETE SET NULL;
           ALTER TABLE jobs ADD COLUMN IF NOT EXISTS revised_total DECIMAL(10,2);
           ALTER TABLE jobs ADD COLUMN IF NOT EXISTS revision_notes TEXT;
@@ -242,6 +244,8 @@ export class FixersService implements OnModuleInit {
       ...(dto.pincode !== undefined && { pincode: dto.pincode }),
       ...(dto.latitude !== undefined && { latitude: dto.latitude }),
       ...(dto.longitude !== undefined && { longitude: dto.longitude }),
+      ...(dto.profilePhotoKey !== undefined && { profilePhotoKey: dto.profilePhotoKey }),
+      ...(dto.workshopPhotos !== undefined && { workshopPhotos: dto.workshopPhotos }),
     });
 
     return this.fixerRepo.save(fixer);

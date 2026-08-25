@@ -6,6 +6,8 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Image,
+  Modal,
 } from 'react-native';
 import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -23,7 +25,9 @@ interface FixerProfile {
   totalReviews: number;
   completedJobs: number;
   experienceYears: number;
-  emergencyService: boolean;
+  emergencyService?: boolean;
+  profilePhotoKey?: string | null;
+  workshopPhotos?: string[];
   services: Array<{ id: string; category: { name: string }; brand: { name: string } | null }>;
 }
 
@@ -73,15 +77,21 @@ export function FixerProfileScreen({ route, navigation }: any) {
 
   const reviewList = Array.isArray(reviews) ? reviews : [];
 
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Profile Header */}
       <View style={styles.profileHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(fixer.companyName || fixer.ownerName || 'F').charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        {fixer.profilePhotoKey ? (
+          <Image source={{ uri: fixer.profilePhotoKey }} style={styles.avatarImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {(fixer.companyName || fixer.ownerName || 'F').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
         <Text style={styles.companyName}>{fixer.companyName || fixer.ownerName}</Text>
         {fixer.ownerName ? <Text style={styles.ownerName}>{fixer.ownerName}</Text> : null}
         <Text style={styles.location}>📍 {fixer.city}, {fixer.state}</Text>
@@ -116,6 +126,28 @@ export function FixerProfileScreen({ route, navigation }: any) {
           </View>
         </View>
       </View>
+
+      {/* Workshop / Shop Photos */}
+      {Array.isArray(fixer.workshopPhotos) && fixer.workshopPhotos.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Workshop & Shop Photos ({fixer.workshopPhotos.length})</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll}>
+            {fixer.workshopPhotos.map((pUri, pIdx) => (
+              <TouchableOpacity
+                key={pIdx}
+                activeOpacity={0.8}
+                style={styles.photoCard}
+                onPress={() => setSelectedPhoto(pUri)}
+              >
+                <Image source={{ uri: pUri }} style={styles.workshopPhotoThumb} resizeMode="cover" />
+                <View style={styles.zoomBadge}>
+                  <Text style={styles.zoomText}>🔍</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Description */}
       {fixer.description ? (
@@ -176,6 +208,30 @@ export function FixerProfileScreen({ route, navigation }: any) {
           })
         )}
       </View>
+
+      {/* Photo Preview Modal */}
+      <Modal
+        visible={!!selectedPhoto}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={styles.closeModalBtn}
+            onPress={() => setSelectedPhoto(null)}
+          >
+            <Text style={styles.closeModalText}>✕ Close</Text>
+          </TouchableOpacity>
+          {selectedPhoto ? (
+            <Image
+              source={{ uri: selectedPhoto }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -202,6 +258,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.md,
+  },
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    marginBottom: Spacing.md,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 2,
+    borderColor: Colors.accent,
   },
   avatarText: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.accent },
   companyName: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
@@ -265,4 +330,44 @@ const styles = StyleSheet.create({
   reviewDate: { fontSize: FontSize.xs, color: Colors.muted },
   reviewComment: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.xs },
   reviewAuthor: { fontSize: FontSize.xs, color: Colors.muted, fontStyle: 'italic' },
+
+  photoScroll: { flexDirection: 'row', marginTop: Spacing.xs },
+  photoCard: { position: 'relative', marginRight: Spacing.sm },
+  workshopPhotoThumb: {
+    width: 100,
+    height: 100,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  zoomBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  zoomText: { fontSize: 10, color: Colors.white },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: { width: '90%', height: '80%' },
+  closeModalBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    zIndex: 10,
+  },
+  closeModalText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 });

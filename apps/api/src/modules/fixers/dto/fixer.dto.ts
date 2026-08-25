@@ -43,6 +43,17 @@ export class RegisterFixerDto {
   @MaxLength(2000)
   description?: string;
 
+  @ApiPropertyOptional({ description: 'Profile / Workshop logo base64 or URL' })
+  @IsOptional()
+  @IsString()
+  profilePhotoKey?: string;
+
+  @ApiPropertyOptional({ description: 'Workshop photos array (base64 or URLs)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  workshopPhotos?: string[];
+
   @ApiProperty({ example: 5, minimum: 0, maximum: 50 })
   @IsInt()
   @Min(0)

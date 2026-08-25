@@ -13,8 +13,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { Button, Input } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
@@ -42,6 +44,7 @@ export function FixerManageMembersScreen({ navigation }: any) {
     email: '',
     phone: '',
     password: '',
+    photo: '' as string,
   });
 
   // Password Reset Modal
@@ -68,6 +71,49 @@ export function FixerManageMembersScreen({ navigation }: any) {
     }, [fetchMembers]),
   );
 
+  const handlePickMemberPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant photo gallery permission to attach a technician photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const photoUri = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : asset.uri;
+      setNewMember((prev) => ({ ...prev, photo: photoUri }));
+    }
+  };
+
+  const handleTakeMemberPhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant camera permission to take a technician photo.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const photoUri = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : asset.uri;
+      setNewMember((prev) => ({ ...prev, photo: photoUri }));
+    }
+  };
+
   const handleAddMember = async () => {
     if (!newMember.fullName.trim() || !newMember.email.trim() || !newMember.phone.trim() || !newMember.password) {
       Alert.alert('Required Fields', 'Please fill in full name, email, phone number, and initial password.');
@@ -85,10 +131,11 @@ export function FixerManageMembersScreen({ navigation }: any) {
         email: newMember.email.trim().toLowerCase(),
         phone: newMember.phone.trim(),
         password: newMember.password,
+        profilePhotoKey: newMember.photo || undefined,
       });
       Alert.alert('Technician Added! 🎉', `${newMember.fullName} can now log in using the Staff Login with this email and password.`);
       setAddModalVisible(false);
-      setNewMember({ fullName: '', email: '', phone: '', password: '' });
+      setNewMember({ fullName: '', email: '', phone: '', password: '', photo: '' });
       fetchMembers();
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || 'Failed to add technician');
@@ -145,9 +192,13 @@ export function FixerManageMembersScreen({ navigation }: any) {
   const renderMember = ({ item }: { item: FixerMember }) => (
     <View style={styles.memberCard}>
       <View style={styles.memberHeaderRow}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text>
-        </View>
+        {item.profilePhotoKey ? (
+          <Image source={{ uri: item.profilePhotoKey }} style={styles.avatarImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
         <View style={styles.memberInfo}>
           <Text style={styles.memberName}>{item.fullName}</Text>
           <Text style={styles.memberContact}>📧 {item.email}</Text>
@@ -246,6 +297,37 @@ export function FixerManageMembersScreen({ navigation }: any) {
               <Text style={styles.modalSubtitle}>
                 Create staff credentials for your technician. They will use this email and password to log in.
               </Text>
+
+              {/* Photo Upload Section (Optional) */}
+              <View style={styles.photoPickerSection}>
+                <Text style={styles.photoSectionLabel}>Technician Photo (Optional)</Text>
+                <View style={styles.photoPickerRow}>
+                  {newMember.photo ? (
+                    <View style={styles.previewContainer}>
+                      <Image source={{ uri: newMember.photo }} style={styles.photoPreview} />
+                      <TouchableOpacity
+                        style={styles.removePhotoBtn}
+                        onPress={() => setNewMember((p) => ({ ...p, photo: '' }))}
+                      >
+                        <Text style={styles.removePhotoText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Text style={styles.placeholderIcon}>👤</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.photoActionButtons}>
+                    <TouchableOpacity style={styles.uploadPhotoBtn} onPress={handlePickMemberPhoto}>
+                      <Text style={styles.uploadPhotoText}>📁 Choose from Gallery</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.uploadCameraBtn} onPress={handleTakeMemberPhoto}>
+                      <Text style={styles.uploadCameraText}>📸 Take Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
 
               <Input
                 label="Technician Full Name *"
@@ -384,15 +466,24 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: Colors.accentSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.accent,
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: Spacing.md,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
   avatarText: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.accent },
   memberInfo: { flex: 1 },
@@ -465,6 +556,73 @@ const styles = StyleSheet.create({
   modalCloseText: { fontSize: FontSize.sm, color: Colors.muted, fontWeight: FontWeight.semibold },
   modalContent: { padding: Spacing.base, gap: Spacing.sm },
   modalSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginBottom: Spacing.sm, lineHeight: 18 },
+
+  photoPickerSection: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    marginBottom: Spacing.xs,
+  },
+  photoSectionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
+  },
+  photoPickerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  previewContainer: { position: 'relative' },
+  photoPreview: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#DC2626',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removePhotoText: { color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold },
+  photoPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderIcon: { fontSize: 24, color: Colors.muted },
+  photoActionButtons: { flex: 1, gap: 6 },
+  uploadPhotoBtn: {
+    backgroundColor: Colors.accentSoft,
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    alignItems: 'center',
+  },
+  uploadPhotoText: { color: Colors.accent, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  uploadCameraBtn: {
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    alignItems: 'center',
+  },
+  uploadCameraText: { color: Colors.text, fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+
   modalBtnSection: { marginTop: Spacing.md },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.base },

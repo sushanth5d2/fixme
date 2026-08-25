@@ -42,8 +42,11 @@ export class FixerEntity {
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
-  @Column({ name: 'profile_photo_key', type: 'varchar', length: 512, nullable: true })
+  @Column({ name: 'profile_photo_key', type: 'text', nullable: true })
   profilePhotoKey!: string | null;
+
+  @Column({ name: 'workshop_photos', type: 'text', array: true, default: [] })
+  workshopPhotos!: string[];
 
   @Column({ name: 'experience_years', type: 'smallint', default: 0 })
   experienceYears!: number;

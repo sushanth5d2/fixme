@@ -10,8 +10,10 @@ import {
   Switch,
   ActivityIndicator,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { Button, Input } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
@@ -32,6 +34,8 @@ export function FixerEditProfileScreen({ navigation }: any) {
     workingHoursStart: '09:00',
     workingHoursEnd: '19:00',
   });
+  const [logoPhoto, setLogoPhoto] = useState<string>('');
+  const [shopPhotos, setShopPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -56,6 +60,12 @@ export function FixerEditProfileScreen({ navigation }: any) {
           workingHoursStart: p.workingHoursStart || '09:00',
           workingHoursEnd: p.workingHoursEnd || '19:00',
         });
+        if (p.profilePhotoKey) {
+          setLogoPhoto(p.profilePhotoKey);
+        }
+        if (Array.isArray(p.workshopPhotos)) {
+          setShopPhotos(p.workshopPhotos);
+        }
       } catch (err) {
         console.error('[Load Fixer Profile Error]', err);
       } finally {
@@ -67,36 +77,104 @@ export function FixerEditProfileScreen({ navigation }: any) {
 
   const update = (k: string, v: any) => setForm((p) => ({ ...p, [k]: v }));
 
+  const handlePickLogo = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow gallery access to upload your business logo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+      setLogoPhoto(uri);
+    }
+  };
+
+  const handlePickShopPhoto = async () => {
+    if (shopPhotos.length >= 6) {
+      Alert.alert('Limit Reached', 'You can upload up to 6 workshop photos.');
+      return;
+    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow gallery access to upload workshop photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+      setShopPhotos((prev) => [...prev, uri]);
+    }
+  };
+
+  const handleTakeShopPhoto = async () => {
+    if (shopPhotos.length >= 6) {
+      Alert.alert('Limit Reached', 'You can upload up to 6 workshop photos.');
+      return;
+    }
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow camera access to take workshop photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+      setShopPhotos((prev) => [...prev, uri]);
+    }
+  };
+
+  const handleRemoveShopPhoto = (index: number) => {
+    setShopPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleDetectLocation = async () => {
     setLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please grant location access to auto-detect your workshop area.');
+        Alert.alert(
+          'Permission Needed',
+          'Please allow location access to auto-detect your workshop address, or enter it manually below.',
+        );
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const lat = loc.coords.latitude;
-      const lng = loc.coords.longitude;
-      update('latitude', lat);
-      update('longitude', lng);
 
-      const geocode = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lng,
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
       });
 
-      if (geocode && geocode.length > 0) {
-        const place = geocode[0];
-        const streetPart = [place.name, place.street, place.district || place.subregion]
-          .filter(Boolean)
-          .join(', ');
-        if (streetPart) update('addressLine', streetPart);
-        if (place.city) update('city', place.city);
-        if (place.region) update('state', place.region);
-        if (place.postalCode) update('pincode', place.postalCode);
+      const { latitude, longitude } = loc.coords;
+      update('latitude', latitude);
+      update('longitude', longitude);
+
+      const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (geo) {
+        const line = [geo.name, geo.streetNumber, geo.street].filter(Boolean).join(', ');
+        if (line) update('addressLine', line);
+        if (geo.city || geo.subregion) update('city', geo.city || geo.subregion || 'Bengaluru');
+        if (geo.region) update('state', geo.region || 'Karnataka');
+        if (geo.postalCode) update('pincode', geo.postalCode.replace(/\D/g, '').slice(0, 6));
       }
-      Alert.alert('Location Detected 📍', 'Workshop address and GPS coordinates have been auto-filled.');
+
+      Alert.alert('Location Detected 📍', 'Your workshop coordinates and address have been populated.');
     } catch {
       Alert.alert('Location Error', 'Could not auto-detect location. Please enter workshop address manually.');
     } finally {
@@ -123,6 +201,8 @@ export function FixerEditProfileScreen({ navigation }: any) {
         ownerName: form.ownerName.trim(),
         experienceYears: parseInt(form.experienceYears, 10) || 1,
         emergencyService: !!form.emergencyService,
+        profilePhotoKey: logoPhoto || undefined,
+        workshopPhotos: shopPhotos,
       };
 
       if (form.description?.trim()) payload.description = form.description.trim();
@@ -135,7 +215,7 @@ export function FixerEditProfileScreen({ navigation }: any) {
 
       await api.patch('/fixers/me', payload);
 
-      Alert.alert('Success 🎉', 'Business profile and workshop address updated successfully!', [
+      Alert.alert('Success 🎉', 'Business profile, workshop photos, and address updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (err: any) {
@@ -158,6 +238,35 @@ export function FixerEditProfileScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {/* Business Logo / Profile Photo (Optional) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Shop Logo / Profile Photo (Optional)</Text>
+          <View style={styles.logoRow}>
+            {logoPhoto ? (
+              <View style={styles.logoPreviewContainer}>
+                <Image source={{ uri: logoPhoto }} style={styles.logoPreview} />
+                <TouchableOpacity
+                  style={styles.removeLogoBtn}
+                  onPress={() => setLogoPhoto('')}
+                >
+                  <Text style={styles.removeLogoText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.logoPlaceholder}>
+                <Text style={styles.logoPlaceholderIcon}>🏢</Text>
+              </View>
+            )}
+
+            <View style={styles.logoActionBtns}>
+              <TouchableOpacity style={styles.pickLogoBtn} onPress={handlePickLogo}>
+                <Text style={styles.pickLogoBtnText}>📷 Select Logo / Photo</Text>
+              </TouchableOpacity>
+              <Text style={styles.fieldHint}>Helps customers identify your shop</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Business Information */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Business Information</Text>
@@ -193,6 +302,44 @@ export function FixerEditProfileScreen({ navigation }: any) {
             numberOfLines={3}
             style={{ height: 80, textAlignVertical: 'top' }}
           />
+        </View>
+
+        {/* Workshop / Shop Photos (Optional) */}
+        <View style={styles.card}>
+          <View style={styles.addressHeaderRow}>
+            <Text style={styles.cardTitle}>Workshop / Shop Photos (Optional)</Text>
+            <Text style={styles.photoCount}>{shopPhotos.length}/6</Text>
+          </View>
+          <Text style={styles.photoSectionSubtitle}>
+            Upload photos of your storefront, repair workbench, tools, or staff to build customer trust.
+          </Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScroll}>
+            {shopPhotos.map((photoUri, index) => (
+              <View key={index} style={styles.shopThumbContainer}>
+                <Image source={{ uri: photoUri }} style={styles.shopThumb} resizeMode="cover" />
+                <TouchableOpacity
+                  style={styles.removeShopThumbBtn}
+                  onPress={() => handleRemoveShopPhoto(index)}
+                >
+                  <Text style={styles.removeShopThumbText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            {shopPhotos.length < 6 && (
+              <View style={styles.addPhotoActions}>
+                <TouchableOpacity style={styles.addShopPhotoBtn} onPress={handlePickShopPhoto}>
+                  <Text style={styles.addShopPhotoIcon}>📁</Text>
+                  <Text style={styles.addShopPhotoText}>Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.addShopPhotoCameraBtn} onPress={handleTakeShopPhoto}>
+                  <Text style={styles.addShopPhotoIcon}>📸</Text>
+                  <Text style={styles.addShopPhotoText}>Camera</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
         </View>
 
         {/* Workshop Address & Location */}
@@ -248,55 +395,36 @@ export function FixerEditProfileScreen({ navigation }: any) {
           {form.latitude && form.longitude ? (
             <View style={styles.gpsBadge}>
               <Text style={styles.gpsText}>
-                📍 Coordinates: {Number(form.latitude).toFixed(4)}, {Number(form.longitude).toFixed(4)}
+                📍 Workshop GPS Pinned: {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)}
               </Text>
             </View>
           ) : null}
         </View>
 
-        {/* Availability & Emergency */}
+        {/* Service Options */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Availability & Working Hours</Text>
-
+          <Text style={styles.cardTitle}>Service Preferences</Text>
           <View style={styles.switchRow}>
-            <View style={styles.switchInfo}>
-              <Text style={styles.switchLabel}>24/7 Emergency Service</Text>
-              <Text style={styles.switchSub}>Allow customers to contact you for urgent repairs</Text>
+            <View style={styles.switchLabelContainer}>
+              <Text style={styles.switchLabel}>Emergency / Instant Service ⚡</Text>
+              <Text style={styles.switchSublabel}>Available for urgent doorstep repair visits</Text>
             </View>
             <Switch
               value={form.emergencyService}
               onValueChange={(v) => update('emergencyService', v)}
-              trackColor={{ false: '#D1D5DB', true: Colors.accentSoft }}
-              thumbColor={form.emergencyService ? Colors.accent : '#9CA3AF'}
-            />
-          </View>
-
-          <View style={styles.row}>
-            <Input
-              label="Start Time"
-              value={form.workingHoursStart}
-              onChangeText={(v) => update('workingHoursStart', v)}
-              containerStyle={styles.half}
-              placeholder="09:00"
-            />
-            <Input
-              label="End Time"
-              value={form.workingHoursEnd}
-              onChangeText={(v) => update('workingHoursEnd', v)}
-              containerStyle={styles.half}
-              placeholder="19:00"
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor={Colors.white}
             />
           </View>
         </View>
 
-        <View style={styles.btnSection}>
-          <Button
-            title="Save Profile"
-            onPress={handleSave}
-            loading={loading}
-            size="lg"
-          />
-        </View>
+        <Button
+          title="Save Business Profile"
+          onPress={handleSave}
+          loading={loading}
+          size="lg"
+          style={styles.saveBtn}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -305,50 +433,152 @@ export function FixerEditProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
+  container: { padding: Spacing.base, paddingBottom: Spacing.xxxl, gap: Spacing.md },
   card: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.base,
-    marginBottom: Spacing.md,
+    gap: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.borderLight,
-    gap: Spacing.sm,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  cardTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.xs },
+  cardTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  fieldHint: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
+
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.xs },
+  logoPreviewContainer: { position: 'relative' },
+  logoPreview: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  removeLogoBtn: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#DC2626',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeLogoText: { color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold },
+  logoPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoPlaceholderIcon: { fontSize: 26 },
+  logoActionBtns: { flex: 1 },
+  pickLogoBtn: {
+    backgroundColor: Colors.accentSoft,
+    paddingVertical: 8,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignSelf: 'flex-start',
+  },
+  pickLogoBtnText: { color: Colors.accent, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+
+  photoCount: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent },
+  photoSectionSubtitle: { fontSize: FontSize.xs, color: Colors.muted, lineHeight: 18 },
+  photosScroll: { flexDirection: 'row', marginTop: Spacing.xs },
+  shopThumbContainer: { position: 'relative', marginRight: Spacing.sm },
+  shopThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  removeShopThumbBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#DC2626',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeShopThumbText: { color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold },
+  addPhotoActions: { flexDirection: 'row', gap: Spacing.xs },
+  addShopPhotoBtn: {
+    width: 72,
+    height: 80,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    borderStyle: 'dashed',
+    backgroundColor: Colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addShopPhotoCameraBtn: {
+    width: 72,
+    height: 80,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addShopPhotoIcon: { fontSize: 20, marginBottom: 2 },
+  addShopPhotoText: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.text },
+
   addressHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
   },
   detectLocationBtn: {
     backgroundColor: Colors.accentSoft,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.accent,
+    borderRadius: BorderRadius.sm,
   },
-  detectLocationText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent },
+  detectLocationText: { fontSize: FontSize.xs, color: Colors.accent, fontWeight: FontWeight.semibold },
+
+  row: { flexDirection: 'row', gap: Spacing.sm },
+  half: { flex: 1 },
+
   gpsBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#EFF6FF',
     padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
     marginTop: Spacing.xs,
   },
-  gpsText: { fontSize: FontSize.xs, color: Colors.muted, fontWeight: FontWeight.medium },
-  row: { flexDirection: 'row', gap: Spacing.md },
-  half: { flex: 1 },
+  gpsText: { fontSize: FontSize.xs, color: '#1D4ED8', fontWeight: FontWeight.medium },
+
   switchRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: Spacing.xs,
   },
-  switchInfo: { flex: 1, paddingRight: Spacing.md },
-  switchLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
-  switchSub: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
-  btnSection: { marginTop: Spacing.sm },
+  switchLabelContainer: { flex: 1, marginRight: Spacing.md },
+  switchLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.text },
+  switchSublabel: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
+
+  saveBtn: { marginTop: Spacing.sm },
 });
