@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { RequestStatus, UserRole, UrgencyLevel } from '@fixme/shared-types';
+import { RequestStatus, UserRole, UrgencyLevel, MediaType } from '@fixme/shared-types';
 import { RepairRequestEntity } from './repair-request.entity';
 import { RepairRequestMediaEntity } from './repair-request-media.entity';
 import { CustomerEntity } from '../customers/customer.entity';
@@ -189,8 +189,9 @@ export class RepairRequestsService {
             await this.mediaRepo.save(
               this.mediaRepo.create({
                 requestId: saved.id,
+                type: MediaType.PHOTO,
                 storageKey: photoUrl,
-                originalName: 'photo.jpg',
+                originalFilename: 'photo.jpg',
                 mimeType: 'image/jpeg',
                 sizeBytes: 1024,
               }),

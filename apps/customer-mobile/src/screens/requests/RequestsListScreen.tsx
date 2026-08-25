@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,25 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
 interface RepairRequest {
   id: string;
-  description: string;
+  problemTitle?: string;
+  problemDescription?: string;
+  description?: string;
   status: string;
-  priority: string;
+  priority?: string;
+  urgency?: string;
   deviceModel: string | null;
   category: { name: string };
   brand: { name: string } | null;
+  area?: string | null;
+  city?: string | null;
+  pincode?: string | null;
+  media?: Array<{ id: string; storageKey: string }>;
   createdAt: string;
 }
 
@@ -55,13 +63,20 @@ export function RequestsListScreen({ navigation }: any) {
       }
       setHasMore(items.length === 15);
       setPage(p);
-    } catch {} finally {
+    } catch (err) {
+      console.error('[Fetch Requests Error]', err);
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { fetchRequests(1, true); }, []);
+  // Automatically refresh whenever the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchRequests(1, true);
+    }, [fetchRequests]),
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -69,11 +84,16 @@ export function RequestsListScreen({ navigation }: any) {
   };
 
   const onEndReached = () => {
-    if (hasMore && !loading) fetchRequests(page + 1);
+    if (hasMore && !loading && !refreshing) {
+      fetchRequests(page + 1);
+    }
   };
 
   const renderItem = ({ item }: { item: RepairRequest }) => {
     const status = STATUS_CONFIG[item.status] || { color: Colors.muted, label: item.status };
+    const desc = item.problemDescription || item.description || '';
+    const location = item.area || item.city ? `${item.area ? item.area + ', ' : ''}${item.city || ''}` : '';
+
     return (
       <TouchableOpacity
         style={styles.card}
@@ -84,25 +104,35 @@ export function RequestsListScreen({ navigation }: any) {
         })}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.category}>{item.category?.name}</Text>
+          <Text style={styles.category}>{item.category?.name || 'Device Repair'}</Text>
           <View style={[styles.badge, { backgroundColor: status.color + '18' }]}>
             <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
           </View>
         </View>
-        {item.deviceModel && (
+
+        {item.deviceModel ? (
           <Text style={styles.model}>{item.deviceModel}</Text>
-        )}
-        <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
-        <Text style={styles.date}>
-          {new Date(item.createdAt).toLocaleDateString('en-IN', {
-            day: 'numeric', month: 'short', year: 'numeric',
-          })}
-        </Text>
+        ) : null}
+
+        <Text style={styles.desc} numberOfLines={2}>{desc}</Text>
+
+        <View style={styles.cardFooter}>
+          {location ? (
+            <Text style={styles.location}>📍 {location}</Text>
+          ) : (
+            <View />
+          )}
+          <Text style={styles.date}>
+            {new Date(item.createdAt).toLocaleDateString('en-IN', {
+              day: 'numeric', month: 'short', year: 'numeric',
+            })}
+          </Text>
+        </View>
       </TouchableOpacity>
     );
   };
 
-  if (loading) {
+  if (loading && requests.length === 0) {
     return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
   }
 
@@ -124,7 +154,7 @@ export function RequestsListScreen({ navigation }: any) {
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>📋</Text>
             <Text style={styles.emptyTitle}>No requests yet</Text>
-            <Text style={styles.emptyText}>Tap the Home tab to create your first repair request</Text>
+            <Text style={styles.emptyText}>Tap the Home tab to post your first repair request</Text>
           </View>
         }
       />
@@ -139,23 +169,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.xl, paddingTop: Spacing.xxxl + 10, paddingBottom: Spacing.base,
     backgroundColor: Colors.white,
+    borderBottomWidth: 1, borderColor: Colors.borderLight,
   },
   title: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.text },
   count: { fontSize: FontSize.sm, color: Colors.muted },
-  list: { padding: Spacing.xl, paddingTop: Spacing.md },
+  list: { padding: Spacing.base, paddingTop: Spacing.md },
   card: {
     backgroundColor: Colors.card, borderRadius: BorderRadius.lg, padding: Spacing.base,
     marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4, elevation: 1,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs },
   category: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
   badge: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full },
   badgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
-  model: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.xs },
+  model: { fontSize: FontSize.sm, color: Colors.accent, fontWeight: FontWeight.medium, marginBottom: Spacing.xs },
   desc: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.sm },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  location: { fontSize: FontSize.xs, color: Colors.muted },
   date: { fontSize: FontSize.xs, color: Colors.muted },
   empty: { alignItems: 'center', paddingTop: Spacing.xxxl },
   emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
   emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: Spacing.xs },
-  emptyText: { fontSize: FontSize.sm, color: Colors.muted, textAlign: 'center' },
+  emptyText: { fontSize: FontSize.sm, color: Colors.muted, textAlign: 'center', marginTop: 4 },
 });
