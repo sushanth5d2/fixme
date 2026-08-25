@@ -10,6 +10,7 @@ import {
   ProfileStackParamList,
 } from './types';
 import { RequestFeedScreen } from '../screens/home/RequestFeedScreen';
+import { FixerRequestDetailScreen } from '../screens/home/FixerRequestDetailScreen';
 import { SubmitQuoteScreen } from '../screens/home/SubmitQuoteScreen';
 import { MyQuotesScreen } from '../screens/home/MyQuotesScreen';
 import { MyJobsScreen } from '../screens/jobs/MyJobsScreen';
@@ -29,6 +30,7 @@ function FeedNavigator() {
   return (
     <FeedStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <FeedStack.Screen name="Feed" component={RequestFeedScreen} options={{ headerShown: false }} />
+      <FeedStack.Screen name="RequestDetail" component={FixerRequestDetailScreen} options={{ title: 'Request Details' }} />
       <FeedStack.Screen name="SubmitQuote" component={SubmitQuoteScreen} options={{ title: 'Send Quote' }} />
     </FeedStack.Navigator>
   );
