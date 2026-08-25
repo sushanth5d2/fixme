@@ -116,6 +116,33 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
     );
   };
 
+  const handleCancelJob = () => {
+    if (!job) return;
+    Alert.alert(
+      'Cancel & Release Job',
+      "Are you sure you want to cancel this job? This will release your assignment and reset the customer's request back to open so other fixers can quote.",
+      [
+        { text: 'Keep Job', style: 'cancel' },
+        {
+          text: 'Cancel Job',
+          style: 'destructive',
+          onPress: async () => {
+            setUpdating(true);
+            try {
+              await api.patch(`/jobs/${jobId}/cancel`, { reason: 'Fixer cancelled assignment' });
+              Alert.alert('Job Cancelled', 'The job has been released and the customer request reset.');
+              navigation.goBack();
+            } catch (err: any) {
+              Alert.alert('Error', err?.response?.data?.message || 'Failed to cancel job');
+            } finally {
+              setUpdating(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleStartChat = async () => {
     if (!job) return;
     setStartingChat(true);
@@ -171,6 +198,8 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
     job.request?.pincode ? `- ${job.request.pincode}` : '',
   ].filter(Boolean).join(', ') || 'Customer address on file';
 
+  const canCancel = ['ASSIGNED', 'FIXER_ON_THE_WAY'].includes(job.status);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Status & Amount Card */}
@@ -212,6 +241,17 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
           loading={updating}
           size="lg"
         />
+      )}
+
+      {/* Cancel Action */}
+      {canCancel && (
+        <TouchableOpacity
+          style={styles.cancelJobBtn}
+          onPress={handleCancelJob}
+          disabled={updating}
+        >
+          <Text style={styles.cancelJobText}>✕ Cancel & Release Job</Text>
+        </TouchableOpacity>
       )}
 
       {/* Device Info */}
@@ -350,4 +390,18 @@ const styles = StyleSheet.create({
   timelineStatus: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
   timelineDate: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
   timelineNotes: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, fontStyle: 'italic' },
+  cancelJobBtn: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelJobText: {
+    color: '#DC2626',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+  },
 });

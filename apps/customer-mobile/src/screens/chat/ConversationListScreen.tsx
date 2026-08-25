@@ -105,11 +105,7 @@ export function ConversationListScreen({ navigation }: any) {
             {item.lastMessagePreview || 'Tap to chat with fixer'}
           </Text>
         </View>
-        {!item.isActive && (
-          <View style={styles.closedBadge}>
-            <Text style={styles.closedText}>Closed</Text>
-          </View>
-        )}
+        <Text style={styles.chevron}>›</Text>
       </TouchableOpacity>
     );
   };
@@ -233,6 +229,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   closedText: { fontSize: FontSize.xs, color: Colors.error, fontWeight: FontWeight.medium },
+  chevron: { fontSize: 22, color: Colors.muted, paddingLeft: Spacing.sm },
   empty: { alignItems: 'center', paddingTop: Spacing.xxxl, paddingHorizontal: Spacing.xl },
   emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
   emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: Spacing.xs },

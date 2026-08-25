@@ -128,10 +128,21 @@ export class JobsService {
       job.cancellationReason = dto.reason;
       await manager.save(job);
 
-      // Sync linked customer repair request status
+      // Reset linked customer repair request back to OPEN/QUOTED so other fixers can quote
       if (job.requestId) {
+        const otherQuotesCount = await manager.count(QuoteEntity, {
+          where: { requestId: job.requestId, status: QuoteStatus.SUBMITTED },
+        });
+        const resetStatus = otherQuotesCount > 0 ? RequestStatus.QUOTED : RequestStatus.OPEN;
         await manager.update(RepairRequestEntity, job.requestId, {
-          status: RequestStatus.CANCELLED,
+          status: resetStatus,
+        });
+      }
+
+      // Update the accepted quote status to WITHDRAWN (if fixer cancelled) or REJECTED (if customer cancelled)
+      if (job.quoteId) {
+        await manager.update(QuoteEntity, job.quoteId, {
+          status: isFixerOwner ? QuoteStatus.WITHDRAWN : QuoteStatus.REJECTED,
         });
       }
 
