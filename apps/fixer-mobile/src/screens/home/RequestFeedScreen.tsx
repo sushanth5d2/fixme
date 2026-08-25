@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -47,14 +48,27 @@ const PRIORITY_COLORS: Record<string, string> = {
   EMERGENCY: Colors.error,
 };
 
+function getTimeAgo(dateStr: string) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export function RequestFeedScreen({ navigation }: any) {
   const [requests, setRequests] = useState<FeedRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchFeed = useCallback(async () => {
     try {
-      const { data } = await api.get('/repair-requests/feed?limit=30');
+      const { data } = await api.get('/repair-requests/feed?limit=50');
       const raw = data?.data;
       const items: FeedRequest[] = Array.isArray(raw?.data)
         ? raw.data
@@ -76,6 +90,33 @@ export function RequestFeedScreen({ navigation }: any) {
       fetchFeed();
     }, [fetchFeed]),
   );
+
+  const filteredRequests = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return requests;
+
+    return requests.filter((r) => {
+      const cat = (r.category?.name || '').toLowerCase();
+      const brand = (r.brand?.name || '').toLowerCase();
+      const model = (r.deviceModel || '').toLowerCase();
+      const desc = (r.problemDescription || r.description || r.problemTitle || '').toLowerCase();
+      const locArea = (r.area || r.addressSnapshot?.area || '').toLowerCase();
+      const locCity = (r.city || r.addressSnapshot?.city || '').toLowerCase();
+      const locPin = (r.pincode || r.addressSnapshot?.pincode || '').toLowerCase();
+      const urgency = (r.urgency || r.priority || '').toLowerCase();
+
+      return (
+        cat.includes(q) ||
+        brand.includes(q) ||
+        model.includes(q) ||
+        desc.includes(q) ||
+        locArea.includes(q) ||
+        locCity.includes(q) ||
+        locPin.includes(q) ||
+        urgency.includes(q)
+      );
+    });
+  }, [requests, searchQuery]);
 
   const renderItem = ({ item }: { item: FeedRequest }) => {
     const priority = item.urgency || item.priority || 'MEDIUM';
@@ -99,7 +140,9 @@ export function RequestFeedScreen({ navigation }: any) {
             <Text style={styles.category}>{item.category?.name || 'Device Repair'}</Text>
             {item.brand && <Text style={styles.brand}> · {item.brand.name}</Text>}
           </View>
-          <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
+          <View style={[styles.priorityBadge, { borderColor: priorityColor }]}>
+            <Text style={[styles.priorityText, { color: priorityColor }]}>{priority}</Text>
+          </View>
         </View>
 
         {item.deviceModel && <Text style={styles.model}>{item.deviceModel}</Text>}
@@ -107,9 +150,7 @@ export function RequestFeedScreen({ navigation }: any) {
 
         <View style={styles.cardFooter}>
           <Text style={styles.location}>📍 {location}</Text>
-          <Text style={styles.time}>
-            {getTimeAgo(item.createdAt)}
-          </Text>
+          <Text style={styles.time}>{getTimeAgo(item.createdAt)}</Text>
         </View>
 
         <TouchableOpacity
@@ -126,17 +167,40 @@ export function RequestFeedScreen({ navigation }: any) {
   };
 
   if (loading && requests.length === 0) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Repair Requests</Text>
-        <Text style={styles.subtitle}>Open requests available for quotes ({requests.length} open)</Text>
+        <Text style={styles.title}>Repair Requests 📋</Text>
+        <Text style={styles.subtitle}>Browse open requests available for quotes ({filteredRequests.length} matching)</Text>
+
+        {/* Search Bar */}
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by device, city, area, pincode (e.g. 560001)..."
+            placeholderTextColor={Colors.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            clearButtonMode="while-editing"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Text style={styles.clearBtn}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
+
       <FlatList
-        data={requests}
+        data={filteredRequests}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
@@ -144,8 +208,14 @@ export function RequestFeedScreen({ navigation }: any) {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyTitle}>No open requests</Text>
-            <Text style={styles.emptyText}>New repair requests matching your services will appear here</Text>
+            <Text style={styles.emptyTitle}>
+              {searchQuery ? 'No matching requests found' : 'No open requests'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {searchQuery
+                ? 'Try searching with different keywords, area, or pincode.'
+                : 'New repair requests matching your services will appear here.'}
+            </Text>
           </View>
         }
       />
@@ -153,47 +223,72 @@ export function RequestFeedScreen({ navigation }: any) {
   );
 }
 
-function getTimeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
-    backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xxxl + 20, paddingBottom: Spacing.xl,
-    borderBottomLeftRadius: BorderRadius.xl, borderBottomRightRadius: BorderRadius.xl,
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.xl + 10,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
   },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.white },
-  subtitle: { fontSize: FontSize.sm, color: Colors.muted, marginTop: Spacing.xs },
-  list: { padding: Spacing.base, paddingTop: Spacing.md },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
+  subtitle: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, marginBottom: Spacing.xs },
+
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchIcon: { fontSize: 14, marginRight: 6 },
+  searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, padding: 0 },
+  clearBtn: { fontSize: 14, color: Colors.muted, paddingHorizontal: 4 },
+
+  list: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
   card: {
-    backgroundColor: Colors.card, borderRadius: BorderRadius.lg, padding: Spacing.base,
-    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  categoryRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  category: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs },
+  categoryRow: { flexDirection: 'row', alignItems: 'center' },
+  category: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.accent },
   brand: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  priorityDot: { width: 8, height: 8, borderRadius: 4 },
-  model: { fontSize: FontSize.sm, color: Colors.accent, fontWeight: FontWeight.medium, marginBottom: Spacing.xs },
-  desc: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.md },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.md },
-  location: { fontSize: FontSize.xs, color: Colors.muted },
+  priorityBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1 },
+  priorityText: { fontSize: 10, fontWeight: FontWeight.bold },
+  model: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginTop: 4 },
+  desc: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2, lineHeight: 20 },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingTop: Spacing.xs,
+  },
+  location: { fontSize: FontSize.xs, color: Colors.textSecondary },
   time: { fontSize: FontSize.xs, color: Colors.muted },
   quoteBtn: {
-    backgroundColor: Colors.accentSoft, borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm, alignItems: 'center',
+    backgroundColor: Colors.accent,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: Spacing.sm,
   },
-  quoteBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.accent },
+  quoteBtnText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   empty: { alignItems: 'center', paddingTop: Spacing.xxxl },
   emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
   emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text, marginBottom: Spacing.xs },
-  emptyText: { fontSize: FontSize.sm, color: Colors.muted, textAlign: 'center', paddingHorizontal: Spacing.xl },
+  emptyText: { fontSize: FontSize.xs, color: Colors.muted, textAlign: 'center', paddingHorizontal: Spacing.xl },
 });

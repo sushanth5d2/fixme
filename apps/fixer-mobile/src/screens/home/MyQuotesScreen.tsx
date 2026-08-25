@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -50,6 +51,7 @@ export function MyQuotesScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [startingChat, setStartingChat] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchQuotes = useCallback(async () => {
     try {
@@ -70,6 +72,31 @@ export function MyQuotesScreen({ navigation }: any) {
       fetchQuotes();
     }, [fetchQuotes]),
   );
+
+  const filteredQuotes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return quotes;
+
+    return quotes.filter((item) => {
+      const cat = (item.request?.category?.name || '').toLowerCase();
+      const model = (item.request?.deviceModel || '').toLowerCase();
+      const desc = (item.request?.problemDescription || item.request?.description || '').toLowerCase();
+      const area = (item.request?.area || '').toLowerCase();
+      const city = (item.request?.city || '').toLowerCase();
+      const status = (item.status || '').toLowerCase();
+      const notes = (item.diagnosisNotes || item.notes || '').toLowerCase();
+
+      return (
+        cat.includes(q) ||
+        model.includes(q) ||
+        desc.includes(q) ||
+        area.includes(q) ||
+        city.includes(q) ||
+        status.includes(q) ||
+        notes.includes(q)
+      );
+    });
+  }, [quotes, searchQuery]);
 
   const handleStartChat = async (targetRequestId: string) => {
     setStartingChat(targetRequestId);
@@ -92,7 +119,7 @@ export function MyQuotesScreen({ navigation }: any) {
     }
   };
 
-  if (loading) {
+  if (loading && quotes.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.accent} />
@@ -100,12 +127,10 @@ export function MyQuotesScreen({ navigation }: any) {
     );
   }
 
-  const renderQuoteItem = ({ item }: { item: Quote }) => {
-    const status = STATUS_CONFIG[item.status] || { color: Colors.muted, label: item.status, bg: '#F3F4F6' };
-    const amountVal = Number(item.estimatedTotal ?? item.amount ?? 0);
+  const renderItem = ({ item }: { item: Quote }) => {
+    const statusCfg = STATUS_CONFIG[item.status] || { color: Colors.muted, label: item.status, bg: '#F3F4F6' };
+    const price = Number(item.estimatedTotal ?? item.amount ?? 0);
     const targetRequestId = item.requestId || item.request?.id;
-    const canEdit = item.status === 'SUBMITTED' || item.status === 'VIEWED';
-    const notesText = item.notes || item.diagnosisNotes;
 
     return (
       <View style={styles.card}>
@@ -117,53 +142,81 @@ export function MyQuotesScreen({ navigation }: any) {
             }
           }}
         >
+          {/* Header Row */}
           <View style={styles.cardHeader}>
             <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{item.request?.category?.name || 'Device Repair'}</Text>
+              <Text style={styles.categoryText}>{item.request?.category?.name || 'Repair Request'}</Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: status.bg }]}>
-              <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
+              <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
             </View>
           </View>
 
+          {/* Device Model & Problem */}
           {item.request?.deviceModel ? (
-            <Text style={styles.model}>{item.request.deviceModel}</Text>
+            <Text style={styles.deviceModel}>{item.request.deviceModel}</Text>
           ) : null}
 
-          <Text style={styles.desc} numberOfLines={2}>
-            {item.request?.problemDescription || item.request?.description || 'No description provided'}
+          <Text style={styles.problemDesc} numberOfLines={2}>
+            {item.request?.problemDescription || item.request?.description || 'Repair Job'}
           </Text>
 
-          {item.request?.city || item.request?.area ? (
+          {item.request?.area || item.request?.city ? (
             <Text style={styles.locationText}>
               📍 {[item.request.area, item.request.city].filter(Boolean).join(', ')}
             </Text>
           ) : null}
 
-          {notesText ? (
-            <View style={styles.notesBox}>
-              <Text style={styles.notesTitle}>Your Diagnosis / Note:</Text>
-              <Text style={styles.notesText} numberOfLines={2}>{notesText}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.cardFooter}>
-            <View>
-              <Text style={styles.amountLabel}>Proposed Estimate</Text>
-              <Text style={styles.amount}>₹{amountVal.toLocaleString('en-IN')}</Text>
+          {/* Pricing & Warranty Row */}
+          <View style={styles.quoteDetailsRow}>
+            <View style={styles.priceCol}>
+              <Text style={styles.priceLabel}>Quoted Amount</Text>
+              <Text style={styles.priceValue}>₹{price.toLocaleString('en-IN')}</Text>
             </View>
             <View style={styles.metaCol}>
-              <Text style={styles.warranty}>{item.warrantyDays || 0}d warranty</Text>
-              <Text style={styles.date}>
-                {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </Text>
+              <Text style={styles.metaText}>🛡️ {item.warrantyDays}d Warranty</Text>
+              {item.estimatedCompletionDays ? (
+                <Text style={styles.metaTextSub}>⏱️ ~{item.estimatedCompletionDays} days</Text>
+              ) : null}
             </View>
           </View>
+
+          {/* Diagnosis / Notes if present */}
+          {item.diagnosisNotes || item.notes ? (
+            <View style={styles.notesBox}>
+              <Text style={styles.notesText} numberOfLines={2}>
+                📝 {item.diagnosisNotes || item.notes}
+              </Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
 
-        {/* Action Buttons */}
+        {/* Action Buttons Row */}
         <View style={styles.actionRow}>
-          {targetRequestId && (
+          {targetRequestId ? (
+            <TouchableOpacity
+              style={styles.viewReqBtn}
+              onPress={() => navigation.navigate('RequestDetail', { requestId: targetRequestId })}
+            >
+              <Text style={styles.viewReqText}>View Request 📄</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {item.status === 'SUBMITTED' || item.status === 'VIEWED' ? (
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() =>
+                navigation.navigate('SubmitQuote', {
+                  requestId: targetRequestId,
+                  existingQuote: item,
+                })
+              }
+            >
+              <Text style={styles.editBtnText}>Edit Quote ✏️</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {targetRequestId ? (
             <TouchableOpacity
               style={styles.chatBtn}
               onPress={() => handleStartChat(targetRequestId)}
@@ -175,29 +228,7 @@ export function MyQuotesScreen({ navigation }: any) {
                 <Text style={styles.chatBtnText}>💬 Chat</Text>
               )}
             </TouchableOpacity>
-          )}
-
-          {canEdit && targetRequestId && (
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => navigation.navigate('SubmitQuote', {
-                requestId: targetRequestId,
-                categoryName: item.request?.category?.name,
-                existingQuote: item,
-              })}
-            >
-              <Text style={styles.editBtnText}>Edit Quote ✏️</Text>
-            </TouchableOpacity>
-          )}
-
-          {targetRequestId && (
-            <TouchableOpacity
-              style={styles.detailBtn}
-              onPress={() => navigation.navigate('RequestDetail', { requestId: targetRequestId })}
-            >
-              <Text style={styles.detailBtnText}>Details 📄</Text>
-            </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
     );
@@ -206,13 +237,32 @@ export function MyQuotesScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Submitted Quotes 💼</Text>
-        <Text style={styles.count}>{quotes.length} total quotes</Text>
+        <Text style={styles.title}>My Submitted Quotes 💰</Text>
+        <Text style={styles.subtitle}>{filteredQuotes.length} quotes matching</Text>
+
+        {/* Search Bar */}
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by device, area, notes, status..."
+            placeholderTextColor={Colors.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            clearButtonMode="while-editing"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Text style={styles.clearBtn}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       <FlatList
-        data={quotes}
+        data={filteredQuotes}
         keyExtractor={(item) => item.id}
+        renderItem={renderItem}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl
@@ -223,12 +273,17 @@ export function MyQuotesScreen({ navigation }: any) {
             }}
           />
         }
-        renderItem={renderQuoteItem}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>💰</Text>
-            <Text style={styles.emptyTitle}>No quotes submitted yet</Text>
-            <Text style={styles.emptyText}>Go to the Feed or Map tab to submit quotes on open customer repair requests.</Text>
+            <Text style={styles.emptyIcon}>📝</Text>
+            <Text style={styles.emptyTitle}>
+              {searchQuery ? 'No matching quotes found' : 'No quotes submitted yet'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {searchQuery
+                ? 'Try searching with another device keyword or status.'
+                : 'Browse the repair request feed and submit competitive quotes to customers.'}
+            </Text>
           </View>
         }
       />
@@ -246,12 +301,25 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
   },
   title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  count: { fontSize: FontSize.xs, color: Colors.muted, fontWeight: FontWeight.medium },
+  subtitle: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, marginBottom: Spacing.xs },
+
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchIcon: { fontSize: 14, marginRight: 6 },
+  searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, padding: 0 },
+  clearBtn: { fontSize: 14, color: Colors.muted, paddingHorizontal: 4 },
+
   list: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
   card: {
     backgroundColor: Colors.white,
@@ -262,24 +330,19 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderLight,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs },
-  categoryBadge: { backgroundColor: Colors.accentSoft, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full },
-  categoryText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent },
-  badge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full },
-  badgeText: { fontSize: 11, fontWeight: FontWeight.bold },
-  model: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginTop: 2 },
-  desc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, lineHeight: 18 },
-  locationText: { fontSize: 11, color: Colors.text, fontWeight: FontWeight.medium, marginTop: 4 },
-  notesBox: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: BorderRadius.md,
-    padding: Spacing.xs + 2,
-    marginTop: Spacing.xs,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  categoryBadge: {
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
   },
-  notesTitle: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.muted },
-  notesText: { fontSize: 11, color: Colors.text, marginTop: 1 },
-  cardFooter: {
+  categoryText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent },
+  statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full },
+  statusText: { fontSize: 11, fontWeight: FontWeight.bold },
+  deviceModel: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginTop: 4 },
+  problemDesc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, lineHeight: 18 },
+  locationText: { fontSize: 11, color: Colors.text, fontWeight: FontWeight.medium, marginTop: 4 },
+  quoteDetailsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
@@ -288,11 +351,21 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xs,
     marginTop: Spacing.sm,
   },
-  amountLabel: { fontSize: 10, color: Colors.muted, fontWeight: FontWeight.medium },
-  amount: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.accent },
+  priceCol: {},
+  priceLabel: { fontSize: 10, color: Colors.muted, fontWeight: FontWeight.medium },
+  priceValue: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.accent },
   metaCol: { alignItems: 'flex-end' },
-  warranty: { fontSize: 11, fontWeight: FontWeight.semibold, color: '#15803D' },
-  date: { fontSize: 10, color: Colors.muted, marginTop: 1 },
+  metaText: { fontSize: 11, fontWeight: FontWeight.semibold, color: '#15803D' },
+  metaTextSub: { fontSize: 10, color: Colors.muted, marginTop: 1 },
+  notesBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.xs,
+    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  notesText: { fontSize: 11, color: Colors.textSecondary, fontStyle: 'italic' },
   actionRow: {
     flexDirection: 'row',
     gap: Spacing.xs,
@@ -301,35 +374,37 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderLight,
     paddingTop: Spacing.xs,
   },
-  chatBtn: {
-    flex: 1,
+  viewReqBtn: {
+    flex: 1.2,
+    backgroundColor: '#F3F4F6',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewReqText: { color: Colors.text, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  editBtn: {
+    flex: 1.2,
     backgroundColor: Colors.accentSoft,
     borderRadius: BorderRadius.md,
-    paddingVertical: 7,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: Colors.accent,
   },
-  chatBtnText: { color: Colors.accent, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
-  editBtn: {
-    flex: 1.3,
-    backgroundColor: '#059669',
+  editBtnText: { color: Colors.accent, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  chatBtn: {
+    flex: 0.9,
+    backgroundColor: '#EFF6FF',
     borderRadius: BorderRadius.md,
-    paddingVertical: 7,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#93C5FD',
   },
-  editBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
-  detailBtn: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    borderRadius: BorderRadius.md,
-    paddingVertical: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailBtnText: { color: Colors.text, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  chatBtnText: { color: '#1D4ED8', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   empty: { alignItems: 'center', paddingTop: Spacing.xxxl },
   emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
   emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },

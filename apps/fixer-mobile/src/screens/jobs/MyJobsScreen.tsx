@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -65,6 +66,7 @@ export function MyJobsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [startingChat, setStartingChat] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -85,6 +87,35 @@ export function MyJobsScreen({ navigation }: any) {
       fetchJobs();
     }, [fetchJobs]),
   );
+
+  const filteredJobs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return jobs;
+
+    return jobs.filter((j) => {
+      const custName = `${j.customer?.firstName || ''} ${j.customer?.lastName || ''}`.toLowerCase();
+      const cat = (j.request?.category?.name || '').toLowerCase();
+      const brand = (j.request?.brand?.name || '').toLowerCase();
+      const model = (j.request?.deviceModel || '').toLowerCase();
+      const desc = (j.request?.problemDescription || j.request?.description || j.request?.problemTitle || '').toLowerCase();
+      const area = (j.request?.area || '').toLowerCase();
+      const city = (j.request?.city || '').toLowerCase();
+      const pincode = (j.request?.pincode || '').toLowerCase();
+      const status = (j.status || '').toLowerCase();
+
+      return (
+        custName.includes(q) ||
+        cat.includes(q) ||
+        brand.includes(q) ||
+        model.includes(q) ||
+        desc.includes(q) ||
+        area.includes(q) ||
+        city.includes(q) ||
+        pincode.includes(q) ||
+        status.includes(q)
+      );
+    });
+  }, [jobs, searchQuery]);
 
   const handleStartChat = async (job: Job) => {
     setStartingChat(job.id);
@@ -117,7 +148,7 @@ export function MyJobsScreen({ navigation }: any) {
     }
   };
 
-  if (loading) {
+  if (loading && jobs.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.accent} />
@@ -130,6 +161,7 @@ export function MyJobsScreen({ navigation }: any) {
     const amountVal = Number(item.agreedTotal ?? item.quote?.estimatedTotal ?? item.quote?.amount ?? 0);
     const descText = item.request?.problemDescription || item.request?.description || item.request?.problemTitle || 'Repair Job';
     const addressStr = [item.request?.area, item.request?.city].filter(Boolean).join(', ');
+    const customerName = item.customer?.firstName ? `${item.customer.firstName} ${item.customer?.lastName || ''}`.trim() : 'Customer';
 
     return (
       <View style={styles.card}>
@@ -156,6 +188,11 @@ export function MyJobsScreen({ navigation }: any) {
           <Text style={styles.desc} numberOfLines={2}>
             {descText}
           </Text>
+
+          <View style={styles.customerRow}>
+            <Text style={styles.customerLabel}>👤 Customer: </Text>
+            <Text style={styles.customerName}>{customerName}</Text>
+          </View>
 
           {addressStr ? (
             <Text style={styles.locationText}>📍 {addressStr}</Text>
@@ -211,11 +248,29 @@ export function MyJobsScreen({ navigation }: any) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Assigned Jobs 🔧</Text>
-        <Text style={styles.count}>{jobs.length} active jobs</Text>
+        <Text style={styles.subtitle}>{filteredJobs.length} active jobs matching</Text>
+
+        {/* Search Bar */}
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by customer, device, area, status..."
+            placeholderTextColor={Colors.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            clearButtonMode="while-editing"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Text style={styles.clearBtn}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       <FlatList
-        data={jobs}
+        data={filteredJobs}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
@@ -231,9 +286,13 @@ export function MyJobsScreen({ navigation }: any) {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>🔧</Text>
-            <Text style={styles.emptyTitle}>No active jobs assigned yet</Text>
+            <Text style={styles.emptyTitle}>
+              {searchQuery ? 'No matching jobs found' : 'No active jobs assigned yet'}
+            </Text>
             <Text style={styles.emptyText}>
-              When a customer accepts your submitted quote, the job will immediately appear here.
+              {searchQuery
+                ? 'Try searching with another customer name, area, or device model.'
+                : 'When a customer accepts your submitted quote, the job will immediately appear here.'}
             </Text>
           </View>
         }
@@ -252,12 +311,25 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
   },
   title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  count: { fontSize: FontSize.xs, color: Colors.muted, fontWeight: FontWeight.medium },
+  subtitle: { fontSize: FontSize.xs, color: Colors.muted, fontWeight: FontWeight.medium, marginTop: 2, marginBottom: Spacing.xs },
+
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchIcon: { fontSize: 14, marginRight: 6 },
+  searchInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, padding: 0 },
+  clearBtn: { fontSize: 14, color: Colors.muted, paddingHorizontal: 4 },
+
   list: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
   card: {
     backgroundColor: Colors.white,
@@ -275,7 +347,10 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: FontWeight.bold },
   model: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginTop: 4 },
   desc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, lineHeight: 18 },
-  locationText: { fontSize: 11, color: Colors.text, fontWeight: FontWeight.medium, marginTop: 4 },
+  customerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  customerLabel: { fontSize: 11, color: Colors.muted },
+  customerName: { fontSize: 11, fontWeight: FontWeight.bold, color: Colors.text },
+  locationText: { fontSize: 11, color: Colors.text, fontWeight: FontWeight.medium, marginTop: 2 },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',

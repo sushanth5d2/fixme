@@ -361,25 +361,24 @@ export class RepairRequestsService {
 
   public async getRequestDetailForFixer(
     requestId: string,
-  ): Promise<Partial<RepairRequestEntity>> {
+  ): Promise<any> {
     const request = await this.requestRepo.findOne({
       where: { id: requestId },
       relations: ['category', 'brand', 'media'],
     });
     if (!request) throw new NotFoundException('Repair request not found');
-    if (!FIXER_VISIBLE_STATUSES.includes(request.status)) {
-      throw new ForbiddenException('This request is no longer available');
-    }
 
     return {
       id: request.id,
+      categoryId: request.categoryId,
+      brandId: request.brandId,
       category: request.category,
       brand: request.brand,
       deviceModel: request.deviceModel,
       problemTitle: request.problemTitle,
       problemDescription: request.problemDescription,
-      description: request.description,
-      priority: request.priority,
+      description: request.problemDescription || request.description,
+      priority: request.urgency || request.priority,
       urgency: request.urgency,
       status: request.status,
       media: request.media,
@@ -395,6 +394,17 @@ export class RepairRequestsService {
       pincode: request.pincode,
       latitude: request.latitude,
       longitude: request.longitude,
+      addressSnapshot: {
+        houseBuilding: request.houseBuilding,
+        street: request.street,
+        area: request.area,
+        landmark: request.landmark,
+        city: request.city,
+        state: request.state,
+        pincode: request.pincode,
+        latitude: request.latitude,
+        longitude: request.longitude,
+      },
     };
   }
 
