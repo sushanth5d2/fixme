@@ -32,6 +32,11 @@ function FeedNavigator() {
       <FeedStack.Screen name="Feed" component={RequestFeedScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="RequestDetail" component={FixerRequestDetailScreen} options={{ title: 'Request Details' }} />
       <FeedStack.Screen name="SubmitQuote" component={SubmitQuoteScreen} options={{ title: 'Send Quote' }} />
+      <FeedStack.Screen
+        name="ChatRoom"
+        component={FixerChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
+      />
     </FeedStack.Navigator>
   );
 }
@@ -43,6 +48,11 @@ function JobsNavigator() {
     <JobsStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <JobsStack.Screen name="JobsList" component={MyJobsScreen} options={{ headerShown: false }} />
       <JobsStack.Screen name="JobDetail" component={FixerJobDetailScreen} options={{ title: 'Job Details' }} />
+      <FeedStack.Screen
+        name="ChatRoom"
+        component={FixerChatRoomScreen}
+        options={({ route }: any) => ({ title: route.params?.otherUserName || 'Customer Chat' })}
+      />
     </JobsStack.Navigator>
   );
 }

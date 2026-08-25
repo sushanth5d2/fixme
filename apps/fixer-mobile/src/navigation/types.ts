@@ -17,11 +17,13 @@ export type FeedStackParamList = {
   Feed: undefined;
   RequestDetail: { requestId: string };
   SubmitQuote: { requestId: string; categoryName: string };
+  ChatRoom: { conversationId: string; otherUserName: string };
 };
 
 export type JobsStackParamList = {
   JobsList: undefined;
   JobDetail: { jobId: string };
+  ChatRoom: { conversationId: string; otherUserName: string };
 };
 
 export type ChatStackParamList = {
@@ -34,4 +36,5 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   ManageServices: undefined;
   ManageAreas: undefined;
+  Registration: undefined;
 };

@@ -11,6 +11,7 @@ import {
   Modal,
   SafeAreaView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -53,6 +54,7 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
   const { requestId } = route.params;
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [startingChat, setStartingChat] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,6 +71,29 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
     };
     fetchDetail();
   }, [requestId]);
+
+  const handleStartChat = async () => {
+    if (!request) return;
+    setStartingChat(true);
+    try {
+      const { data } = await api.post('/chat/conversations', {
+        requestId: request.id,
+      });
+      const conv = data?.data || data;
+      if (conv?.id) {
+        navigation.navigate('ChatRoom', {
+          conversationId: conv.id,
+          otherUserName: 'Customer',
+        });
+      }
+    } catch (err: any) {
+      console.error('[Start Chat Error]', err?.response?.data || err);
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || 'Unable to open chat conversation';
+      Alert.alert('Chat Error', msg);
+    } finally {
+      setStartingChat(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -154,7 +179,7 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
         {/* Attached Photos */}
         {request.media && request.media.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>📸 Customer Photos (Tap to open)</Text>
+            <Text style={styles.cardTitle}>📸 Customer Photos (Tap to view)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
               {request.media.map((m, idx) => (
                 <TouchableOpacity
@@ -247,16 +272,31 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
         </SafeAreaView>
       </Modal>
 
-      {/* Bottom Floating Quote Button */}
+      {/* Dual Floating Bottom Actions: Chat with Customer & Send Quote */}
       <View style={styles.bottomBar}>
-        <Button
-          title="Send Quote to Customer 💼"
+        <TouchableOpacity
+          style={styles.chatActionBtn}
+          activeOpacity={0.8}
+          onPress={handleStartChat}
+          disabled={startingChat}
+        >
+          {startingChat ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Text style={styles.chatActionText}>💬 Chat</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quoteActionBtn}
+          activeOpacity={0.8}
           onPress={() => navigation.navigate('SubmitQuote', {
             requestId: request.id,
             categoryName: request.category?.name,
           })}
-          size="lg"
-        />
+        >
+          <Text style={styles.quoteActionText}>Send Quote 💼</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -268,7 +308,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.xs },
   emptySubtitle: { fontSize: FontSize.sm, color: Colors.muted, textAlign: 'center', marginBottom: Spacing.lg },
   container: { flex: 1 },
-  content: { padding: Spacing.base, paddingBottom: 100 },
+  content: { padding: Spacing.base, paddingBottom: 110 },
   card: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
@@ -339,22 +379,6 @@ const styles = StyleSheet.create({
   mapPinText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.text },
   addressText: { fontSize: FontSize.sm, color: Colors.text, marginTop: Spacing.xs, lineHeight: 20 },
   gpsText: { fontSize: 11, color: Colors.muted, marginTop: 2, fontWeight: FontWeight.medium },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
@@ -383,5 +407,51 @@ const styles = StyleSheet.create({
   modalImage: {
     width: '100%',
     height: '100%',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  chatActionBtn: {
+    flex: 1,
+    backgroundColor: Colors.accentSoft,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatActionText: {
+    color: Colors.accent,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+  },
+  quoteActionBtn: {
+    flex: 1.6,
+    backgroundColor: Colors.accent,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quoteActionText: {
+    color: Colors.white,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
   },
 });

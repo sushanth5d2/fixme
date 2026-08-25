@@ -14,9 +14,15 @@ export class SendMessageDto {
 }
 
 export class CreateConversationDto {
-  @ApiProperty({ description: 'Job UUID to link conversation to' })
+  @ApiPropertyOptional({ description: 'Job UUID to link conversation to' })
+  @IsOptional()
   @IsUUID()
-  jobId!: string;
+  jobId?: string;
+
+  @ApiPropertyOptional({ description: 'Repair Request UUID to link conversation to' })
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 
   @ApiPropertyOptional({ example: 'Hello! I would like to discuss the repair.' })
   @IsOptional()
