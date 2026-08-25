@@ -10,6 +10,7 @@ import {
   Linking,
 } from 'react-native';
 import { Input } from '../../components/ui';
+import { InteractiveMapView, MapMarker } from '../../components/ui/InteractiveMapView';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
@@ -25,6 +26,8 @@ interface Fixer {
   city: string;
   pincode: string;
   addressLine?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   averageRating: number;
   totalReviews: number;
   completedJobs: number;
@@ -96,9 +99,34 @@ export function FixerSearchScreen({ navigation }: any) {
   }, [fetchFixers, query]);
 
   const openDirections = (fixer: Fixer) => {
-    const queryStr = [fixer.addressLine, fixer.city, fixer.pincode].filter(Boolean).join(', ');
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryStr || fixer.city || 'Bengaluru')}`);
+    if (fixer.latitude && fixer.longitude) {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${fixer.latitude},${fixer.longitude}`);
+    } else {
+      const queryStr = [fixer.addressLine, fixer.city, fixer.pincode].filter(Boolean).join(', ');
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryStr || fixer.city || 'Bengaluru')}`);
+    }
   };
+
+  const mapMarkers: MapMarker[] = React.useMemo(() => {
+    return fixers.map((fixer, index) => {
+      const baseLat = 12.9716;
+      const baseLng = 77.5946;
+      const lat = fixer.latitude ? Number(fixer.latitude) : (baseLat + (((index * 3) % 7) - 3) * 0.015);
+      const lng = fixer.longitude ? Number(fixer.longitude) : (baseLng + (((index * 4) % 7) - 3) * 0.015);
+
+      return {
+        id: fixer.id,
+        latitude: lat,
+        longitude: lng,
+        title: fixer.companyName || fixer.ownerName,
+        icon: '🔧',
+        badge: `★ ${Number(fixer.averageRating || 5).toFixed(1)}`,
+        badgeBg: '#FEF3C7',
+        badgeColor: '#D97706',
+        data: fixer,
+      };
+    });
+  }, [fixers]);
 
   const renderFixerCard = ({ item }: { item: Fixer }) => {
     const initials = (item.companyName || item.ownerName || 'F')
@@ -279,88 +307,15 @@ export function FixerSearchScreen({ navigation }: any) {
           <Text style={styles.loadingText}>Searching verified fixers...</Text>
         </View>
       ) : viewMode === 'map' ? (
-        /* Map Preview View */
+        /* Live Interactive Street/Satellite Map */
         <View style={styles.mapContainer}>
-          <ScrollView
-            maximumZoomScale={2.5}
-            minimumZoomScale={0.5}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.mapScrollContent}
-          >
-            <View style={[styles.mapCanvas, { transform: [{ scale: zoomLevel }] }]}>
-              {/* Street Grid Lines */}
-              <View style={styles.mapGridRoad1} />
-              <View style={styles.mapGridRoad2} />
-              <View style={styles.mapGridRoad3} />
-              <View style={styles.mapGridRoad4} />
-
-              {/* Plotted Fixer Pins */}
-              {(fixers || []).map((fixer, index) => {
-                const isSelected = selectedFixer?.id === fixer.id;
-                const leftPos = `${15 + (index * 27) % 65}%` as any;
-                const topPos = `${15 + (index * 33) % 55}%` as any;
-
-                return (
-                  <TouchableOpacity
-                    key={fixer.id || index}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.mapPin,
-                      { left: leftPos, top: topPos },
-                      isSelected && styles.mapPinSelected,
-                    ]}
-                    onPress={() => setSelectedFixer(fixer)}
-                  >
-                    <Text style={styles.mapPinIcon}>🔧</Text>
-                    <Text style={styles.mapPinLabel} numberOfLines={1}>
-                      {fixer.companyName || fixer.ownerName}
-                    </Text>
-                    <View style={styles.pinRatingBadge}>
-                      <Text style={styles.pinRatingText}>★ {Number(fixer.averageRating || 5).toFixed(1)}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-
-              {(fixers || []).length === 0 && (
-                <View style={styles.mapEmptyNotice}>
-                  <Text style={styles.mapEmptyText}>No fixers found matching your search.</Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-
-          {/* Floating Zoom Control HUD */}
-          <View style={styles.zoomControlsHud}>
-            <TouchableOpacity
-              style={styles.zoomBtn}
-              onPress={handleZoomIn}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.zoomBtnText}>＋</Text>
-            </TouchableOpacity>
-
-            <View style={styles.zoomLevelBadge}>
-              <Text style={styles.zoomLevelText}>{Math.round(zoomLevel * 100)}%</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.zoomBtn}
-              onPress={handleZoomOut}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.zoomBtnText}>－</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.resetZoomBtn}
-              onPress={handleResetZoom}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.resetZoomText}>🎯</Text>
-            </TouchableOpacity>
-          </View>
+          <InteractiveMapView
+            markers={mapMarkers}
+            selectedMarkerId={selectedFixer?.id}
+            onMarkerPress={(marker) => setSelectedFixer(marker.data)}
+            style={styles.flexMap}
+            showNavigationButton={false}
+          />
 
           {/* Floating Selected Fixer Card */}
           {selectedFixer && (
@@ -618,7 +573,8 @@ const styles = StyleSheet.create({
   },
   viewProfileBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
-  mapContainer: { flex: 1, position: 'relative' },
+  mapContainer: { flex: 1, position: 'relative', overflow: 'hidden' },
+  flexMap: { flex: 1, width: '100%', height: '100%' },
   mapScrollContent: { flexGrow: 1, minHeight: '100%' },
   mapCanvas: {
     flex: 1,

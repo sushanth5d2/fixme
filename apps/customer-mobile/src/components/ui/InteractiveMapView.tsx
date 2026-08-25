@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,8 +13,8 @@ import { Colors, FontSize, FontWeight, BorderRadius, Spacing } from '../../theme
 
 export interface MapMarker {
   id: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | string;
+  longitude: number | string;
   title: string;
   subtitle?: string;
   icon?: string;
@@ -49,20 +49,38 @@ export function InteractiveMapView({
 }: InteractiveMapViewProps) {
   const webViewRef = useRef<WebView>(null);
 
+  // Safely parse all coordinate numbers
   const validMarkers = useMemo(() => {
-    return markers.filter(
-      (m) =>
-        typeof m.latitude === 'number' &&
-        typeof m.longitude === 'number' &&
-        !isNaN(m.latitude) &&
-        !isNaN(m.longitude) &&
-        m.latitude !== 0 &&
-        m.longitude !== 0,
-    );
+    return markers
+      .map((m) => ({
+        ...m,
+        latitude: Number(m.latitude),
+        longitude: Number(m.longitude),
+      }))
+      .filter(
+        (m) =>
+          !isNaN(m.latitude) &&
+          !isNaN(m.longitude) &&
+          m.latitude !== 0 &&
+          m.longitude !== 0,
+      );
   }, [markers]);
 
   const activeCenterLat = validMarkers.length > 0 ? (centerLat || validMarkers[0].latitude) : centerLat;
   const activeCenterLng = validMarkers.length > 0 ? (centerLng || validMarkers[0].longitude) : centerLng;
+
+  // Dynamically update Leaflet markers without refreshing the WebView
+  useEffect(() => {
+    if (webViewRef.current && validMarkers.length > 0) {
+      const script = `
+        if (window.updateMarkers) {
+          window.updateMarkers(${JSON.stringify(validMarkers)}, ${JSON.stringify(selectedMarkerId || '')});
+        }
+        true;
+      `;
+      webViewRef.current.injectJavaScript(script);
+    }
+  }, [validMarkers, selectedMarkerId]);
 
   const htmlContent = useMemo(() => {
     const markersJson = JSON.stringify(validMarkers);
@@ -77,48 +95,82 @@ export function InteractiveMapView({
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
+    * { box-sizing: border-box; }
     html, body, #map {
       height: 100%;
       width: 100%;
       margin: 0;
       padding: 0;
-      background: #F3F4F6;
+      background: #E2E8F0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-    .custom-marker {
+    
+    /* Pin Point Marker with downward needle tip */
+    .pin-anchor {
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .pin-bubble {
       display: flex;
       align-items: center;
-      justify-content: center;
       background: #FFFFFF;
-      border: 2.5px solid #2563EB;
+      border: 2px solid #2563EB;
       border-radius: 20px;
-      padding: 3px 8px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+      padding: 4px 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       font-weight: 700;
       font-size: 11px;
       white-space: nowrap;
-      cursor: pointer;
-      transform: translate(-50%, -50%);
+      transition: transform 0.2s ease;
     }
-    .custom-marker.selected {
+    .pin-anchor.selected .pin-bubble {
       border-color: #EF4444;
       background: #FEF2F2;
-      transform: translate(-50%, -50%) scale(1.15);
-      z-index: 1000 !important;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4), 0 6px 16px rgba(0,0,0,0.35);
+      transform: scale(1.15);
     }
-    .marker-icon {
+    .pin-needle {
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 8px solid #2563EB;
+      margin-top: -1px;
+    }
+    .pin-anchor.selected .pin-needle {
+      border-top-color: #EF4444;
+      border-left-width: 8px;
+      border-right-width: 8px;
+      border-top-width: 10px;
+    }
+    .pin-pulse {
+      width: 8px;
+      height: 8px;
+      background: rgba(37, 99, 235, 0.6);
+      border-radius: 50%;
+      margin-top: 2px;
+    }
+    .pin-anchor.selected .pin-pulse {
+      background: rgba(239, 68, 68, 0.8);
+      width: 10px;
+      height: 10px;
+    }
+    .pin-icon {
       font-size: 14px;
       margin-right: 4px;
     }
-    .marker-title {
+    .pin-title {
       color: #0F172A;
-      max-width: 90px;
+      max-width: 100px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .marker-badge {
+    .pin-badge {
       margin-left: 4px;
-      padding: 1px 4px;
+      padding: 1px 5px;
       border-radius: 6px;
       font-size: 9px;
     }
@@ -129,12 +181,12 @@ export function InteractiveMapView({
       z-index: 999;
       background: #FFFFFF;
       border-radius: 8px;
-      padding: 6px 10px;
+      padding: 6px 12px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       color: #1E293B;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      border: 1px solid #E2E8F0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      border: 1px solid #CBD5E1;
       cursor: pointer;
     }
     .recenter-btn {
@@ -144,13 +196,13 @@ export function InteractiveMapView({
       z-index: 999;
       background: #FFFFFF;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 20px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
       border: 1px solid #CBD5E1;
       cursor: pointer;
     }
@@ -162,15 +214,17 @@ export function InteractiveMapView({
   <button class="recenter-btn" onclick="fitAllMarkers()">🎯</button>
 
   <script>
-    var markersData = ${markersJson};
-    var selectedMarkerId = ${selectedIdStr};
+    var currentMarkers = ${markersJson};
+    var currentSelectedId = ${selectedIdStr};
     var isSatellite = false;
 
+    // High quality street tiles
     var streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
     });
 
+    // Satellite layer
     var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
       attribution: 'Tiles &copy; Esri'
@@ -199,30 +253,35 @@ export function InteractiveMapView({
       }
     }
 
-    function renderMarkers() {
+    function renderPins(markers, selId) {
       markerGroup.clearLayers();
       var bounds = [];
 
-      markersData.forEach(function(m) {
-        if (!m.latitude || !m.longitude) return;
+      markers.forEach(function(m) {
+        if (!m.latitude || !m.longitude || isNaN(m.latitude) || isNaN(m.longitude)) return;
         bounds.push([m.latitude, m.longitude]);
 
-        var isSelected = m.id === selectedMarkerId;
+        var isSelected = m.id === selId;
         var badgeHtml = m.badge
-          ? '<span class="marker-badge" style="background:' + (m.badgeBg || '#EFF6FF') + ';color:' + (m.badgeColor || '#2563EB') + '">' + m.badge + '</span>'
+          ? '<span class="pin-badge" style="background:' + (m.badgeBg || '#EFF6FF') + ';color:' + (m.badgeColor || '#2563EB') + '">' + m.badge + '</span>'
           : '';
 
-        var html = '<div class="custom-marker ' + (isSelected ? 'selected' : '') + '">' +
-          (m.icon ? '<span class="marker-icon">' + m.icon + '</span>' : '📍 ') +
-          '<span class="marker-title">' + (m.title || 'Location') + '</span>' +
+        var html = '<div class="pin-anchor ' + (isSelected ? 'selected' : '') + '">' +
+          '<div class="pin-bubble">' +
+          (m.icon ? '<span class="pin-icon">' + m.icon + '</span>' : '📍 ') +
+          '<span class="pin-title">' + (m.title || 'Location') + '</span>' +
           badgeHtml +
+          '</div>' +
+          '<div class="pin-needle"></div>' +
+          '<div class="pin-pulse"></div>' +
           '</div>';
 
+        // Pin anchor points right at bottom center
         var customIcon = L.divIcon({
           html: html,
           className: '',
-          iconSize: [120, 30],
-          iconAnchor: [60, 15]
+          iconSize: [140, 44],
+          iconAnchor: [70, 44]
         });
 
         var marker = L.marker([m.latitude, m.longitude], { icon: customIcon });
@@ -237,20 +296,29 @@ export function InteractiveMapView({
       });
 
       if (bounds.length > 1) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      } else if (bounds.length === 1) {
+        map.setView(bounds[0], ${initialZoom});
       }
     }
 
+    window.updateMarkers = function(markers, selId) {
+      currentMarkers = markers;
+      currentSelectedId = selId;
+      renderPins(currentMarkers, currentSelectedId);
+    };
+
     function fitAllMarkers() {
-      if (markersData.length > 0) {
-        var bounds = markersData.map(function(m) { return [m.latitude, m.longitude]; });
+      if (currentMarkers.length > 0) {
+        var bounds = currentMarkers.map(function(m) { return [m.latitude, m.longitude]; });
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       } else {
         map.setView([${activeCenterLat}, ${activeCenterLng}], ${initialZoom});
       }
     }
 
-    renderMarkers();
+    // Initial render
+    renderPins(currentMarkers, currentSelectedId);
   </script>
 </body>
 </html>
@@ -269,7 +337,7 @@ export function InteractiveMapView({
   const handleOpenNativeMaps = () => {
     const lat = activeCenterLat;
     const lng = activeCenterLng;
-    const label = encodeURIComponent('Location');
+    const label = encodeURIComponent('Customer Location');
     const url = Platform.select({
       ios: `maps:0,0?q=${lat},${lng}`,
       android: `geo:0,0?q=${lat},${lng}(${label})`,
