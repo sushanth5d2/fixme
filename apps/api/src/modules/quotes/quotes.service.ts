@@ -52,15 +52,19 @@ export class QuotesService {
       throw new ConflictException('You have already submitted a quote for this request');
     }
 
-    const quote = this.quoteRepo.create({
-      requestId: dto.requestId,
-      fixerId: fixer.id,
-      amount: dto.amount,
-      diagnosisNotes: dto.diagnosisNotes ?? null,
-      estimatedDurationHours: dto.estimatedDurationHours ?? null,
-      warrantyDays: dto.warrantyDays ?? 0,
-      status: QuoteStatus.SUBMITTED,
-    });
+    const totalAmount = Number((dto as any).amount ?? (dto as any).estimatedTotal ?? 0);
+    const durationDays = (dto as any).estimatedCompletionDays ?? ((dto as any).estimatedDurationHours ? Math.max(1, Math.ceil((dto as any).estimatedDurationHours / 24)) : 1);
+    const notesText = (dto as any).diagnosisNotes ?? (dto as any).notes ?? null;
+
+    const quote = new QuoteEntity();
+    quote.requestId = dto.requestId;
+    quote.fixerId = fixer.id;
+    quote.estimatedTotal = totalAmount;
+    quote.notes = notesText;
+    quote.estimatedCompletionDays = durationDays;
+    quote.warrantyDays = Number(dto.warrantyDays ?? 0);
+    quote.status = QuoteStatus.SUBMITTED;
+    quote.submittedAt = new Date();
 
     const saved = await this.quoteRepo.save(quote);
 

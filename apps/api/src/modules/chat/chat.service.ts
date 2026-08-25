@@ -162,11 +162,28 @@ export class ChatService {
   public async getMyConversations(
     userId: string,
   ): Promise<ConversationEntity[]> {
-    const members = await this.memberRepo.find({
-      where: { userId },
-      relations: ['conversation', 'conversation.members', 'conversation.members.user'],
-    });
-    return members.map((m) => m.conversation).filter(Boolean);
+    try {
+      const myMemberships = await this.memberRepo.find({
+        where: { userId },
+      });
+
+      if (!myMemberships || myMemberships.length === 0) return [];
+
+      const conversationIds = myMemberships.map((m) => m.conversationId);
+      const conversations = await this.conversationRepo
+        .createQueryBuilder('conv')
+        .leftJoinAndSelect('conv.members', 'member')
+        .leftJoinAndSelect('member.user', 'user')
+        .where('conv.id IN (:...conversationIds)', { conversationIds })
+        .orderBy('conv.lastMessageAt', 'DESC', 'NULLS LAST')
+        .addOrderBy('conv.createdAt', 'DESC')
+        .getMany();
+
+      return conversations;
+    } catch (err) {
+      this.logger.error('Failed to get my conversations', err);
+      return [];
+    }
   }
 
   public async markAsRead(

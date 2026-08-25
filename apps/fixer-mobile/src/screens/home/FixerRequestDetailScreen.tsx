@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   Linking,
   Image,
+  Modal,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -50,6 +53,7 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
   const { requestId } = route.params;
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -150,14 +154,24 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
         {/* Attached Photos */}
         {request.media && request.media.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>📸 Customer Photos ({request.media.length})</Text>
+            <Text style={styles.cardTitle}>📸 Customer Photos (Tap to open)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
               {request.media.map((m, idx) => (
-                <Image
+                <TouchableOpacity
                   key={m.id || idx}
-                  source={{ uri: m.storageKey }}
-                  style={styles.photoThumb}
-                />
+                  activeOpacity={0.8}
+                  onPress={() => setSelectedPhoto(m.storageKey)}
+                  style={styles.photoThumbWrapper}
+                >
+                  <Image
+                    source={{ uri: m.storageKey }}
+                    style={styles.photoThumb}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.zoomBadge}>
+                    <Text style={styles.zoomText}>🔍 View</Text>
+                  </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
@@ -203,6 +217,36 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
         </View>
       </ScrollView>
 
+      {/* Fullscreen Photo Lightbox Modal */}
+      <Modal
+        visible={!!selectedPhoto}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <SafeAreaView style={styles.modalBackdrop}>
+          <StatusBar barStyle="light-content" backgroundColor="#000" />
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Photo Preview</Text>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setSelectedPhoto(null)}
+            >
+              <Text style={styles.modalCloseText}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalImageContainer}>
+            {selectedPhoto ? (
+              <Image
+                source={{ uri: selectedPhoto }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       {/* Bottom Floating Quote Button */}
       <View style={styles.bottomBar}>
         <Button
@@ -246,7 +290,18 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text, marginBottom: Spacing.xs },
   scheduleText: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
   photoRow: { marginTop: Spacing.xs },
-  photoThumb: { width: 90, height: 90, borderRadius: BorderRadius.md, marginRight: Spacing.sm, borderWidth: 1, borderColor: Colors.borderLight },
+  photoThumbWrapper: { marginRight: Spacing.sm, position: 'relative' },
+  photoThumb: { width: 100, height: 100, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.borderLight },
+  zoomBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  zoomText: { color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold },
   mapCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   navBtn: { backgroundColor: Colors.accent, paddingHorizontal: Spacing.md, paddingVertical: 5, borderRadius: BorderRadius.sm },
   navBtnText: { color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold },
@@ -299,5 +354,34 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm,
+  },
+  modalTitle: { color: Colors.white, fontSize: FontSize.base, fontWeight: FontWeight.semibold },
+  modalCloseBtn: {
+    backgroundColor: '#374151',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+  },
+  modalCloseText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  modalImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.base,
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
   },
 });
