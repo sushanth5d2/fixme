@@ -88,7 +88,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
       const { data } = await api.get('/customers/me');
-      set({ user: data.data, isAuthenticated: true, isLoading: false });
+      const profile = data.data;
+      const userData = profile?.user
+        ? { ...profile.user, customerId: profile.id, userId: profile.userId || profile.user.id }
+        : { id: profile?.userId || profile?.id, userId: profile?.userId || profile?.id, ...profile };
+      set({ user: userData, isAuthenticated: true, isLoading: false });
     } catch {
       await apiClient.clearTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });

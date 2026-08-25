@@ -102,9 +102,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
       const { data } = await api.get('/fixers/me');
+      const profile = data.data;
+      const userData = profile?.user
+        ? { ...profile.user, fixerId: profile.id, userId: profile.userId || profile.user.id }
+        : { id: profile?.userId || profile?.id, userId: profile?.userId || profile?.id, ...profile };
       set({
-        user: data.data.user,
-        fixerProfile: data.data.profile,
+        user: userData,
+        fixerProfile: profile,
         isAuthenticated: true,
         isLoading: false,
       });

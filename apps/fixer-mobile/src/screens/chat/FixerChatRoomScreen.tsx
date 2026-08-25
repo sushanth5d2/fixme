@@ -20,13 +20,13 @@ interface Message {
   id: string;
   content: string;
   senderId: string;
-  sender?: { id: string; email?: string };
+  sender?: { id: string; email?: string; role?: string };
   isSystemMessage?: boolean;
   createdAt: string;
 }
 
 export function FixerChatRoomScreen({ route, navigation }: any) {
-  const { conversationId, otherUserName } = route.params;
+  const { conversationId, otherUserName } = route.params || {};
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -67,11 +67,14 @@ export function FixerChatRoomScreen({ route, navigation }: any) {
     setSending(true);
     setText('');
 
+    const myUserId = (user as any)?.userId || user?.id || '';
+
     // Optimistic message
     const optimisticMsg: Message = {
       id: `temp-${Date.now()}`,
       content,
-      senderId: user?.id || '',
+      senderId: myUserId,
+      sender: { id: myUserId, email: user?.email, role: 'FIXER' },
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimisticMsg]);
@@ -83,14 +86,12 @@ export function FixerChatRoomScreen({ route, navigation }: any) {
         content,
       });
       const newMsg = data?.data || data;
-      // Replace optimistic message or re-fetch
       setMessages((prev) =>
         prev.map((m) => (m.id === optimisticMsg.id ? newMsg : m)),
       );
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err) {
       console.error('[Send Fixer Message Error]', err);
-      // Remove optimistic message and restore text on failure
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
       setText(content);
     } finally {
@@ -99,7 +100,21 @@ export function FixerChatRoomScreen({ route, navigation }: any) {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMe = item.senderId === user?.id || item.sender?.id === user?.id;
+    const myUserId = (user as any)?.userId || user?.id;
+
+    // Bulletproof isMe check:
+    // 1. If sender role is FIXER, fixer is viewing this app -> isMe is TRUE
+    // 2. If senderId matches user's ID -> isMe is TRUE
+    // 3. If sender role is CUSTOMER -> isMe is FALSE
+    let isMe = false;
+    if (item.sender?.role === 'FIXER') {
+      isMe = true;
+    } else if (item.sender?.role === 'CUSTOMER') {
+      isMe = false;
+    } else if (myUserId && (item.senderId === myUserId || item.sender?.id === myUserId)) {
+      isMe = true;
+    }
+
     const isSystem = item.isSystemMessage;
 
     if (isSystem) {
@@ -119,22 +134,14 @@ export function FixerChatRoomScreen({ route, navigation }: any) {
         })
       : '';
 
+    const partnerDisplayName = otherUserName || (item.sender?.email ? item.sender.email.split('@')[0] : 'Customer');
+
     return (
-      <View
-        style={[
-          styles.msgRow,
-          isMe ? styles.msgRowMe : styles.msgRowOther,
-        ]}
-      >
-        <View
-          style={[
-            styles.bubble,
-            isMe ? styles.bubbleMe : styles.bubbleOther,
-          ]}
-        >
-          {!isMe && otherUserName ? (
-            <Text style={styles.senderLabel}>{otherUserName}</Text>
-          ) : null}
+      <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
+        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
+          {!isMe && (
+            <Text style={styles.senderLabel}>{partnerDisplayName}</Text>
+          )}
 
           <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextOther]}>
             {item.content}
@@ -233,7 +240,7 @@ export function FixerChatRoomScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.white },
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F1F5F9' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
   loadingText: { marginTop: Spacing.sm, color: Colors.muted, fontSize: FontSize.sm },
 
@@ -252,32 +259,40 @@ const styles = StyleSheet.create({
 
   messageList: { padding: Spacing.base, paddingBottom: Spacing.md },
 
-  msgRow: { marginBottom: Spacing.sm, flexDirection: 'row', width: '100%' },
-  msgRowMe: { justifyContent: 'flex-end' },
-  msgRowOther: { justifyContent: 'flex-start' },
+  msgRow: {
+    marginBottom: Spacing.sm,
+    width: '100%',
+    flexDirection: 'row',
+  },
+  msgRowMe: {
+    justifyContent: 'flex-end',
+  },
+  msgRowOther: {
+    justifyContent: 'flex-start',
+  },
 
   bubble: {
-    maxWidth: '80%',
+    maxWidth: '78%',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 2,
   },
   bubbleMe: {
     backgroundColor: Colors.accent,
     borderBottomRightRadius: 2,
-    marginLeft: 40,
+    marginLeft: 45,
   },
   bubbleOther: {
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 2,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginRight: 40,
+    marginRight: 45,
   },
 
   senderLabel: {
@@ -286,9 +301,9 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     marginBottom: 3,
   },
-  msgText: { fontSize: FontSize.base, lineHeight: 20 },
-  msgTextMe: { color: Colors.white },
-  msgTextOther: { color: '#1E293B' },
+  msgText: { fontSize: FontSize.base, lineHeight: 21 },
+  msgTextMe: { color: '#FFFFFF', fontWeight: FontWeight.normal },
+  msgTextOther: { color: '#0F172A', fontWeight: FontWeight.normal },
 
   timeRow: {
     flexDirection: 'row',
@@ -297,9 +312,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   msgTime: { fontSize: 10 },
-  msgTimeMe: { color: 'rgba(255,255,255,0.75)' },
+  msgTimeMe: { color: 'rgba(255,255,255,0.8)' },
   msgTimeOther: { color: Colors.muted },
-  checkmark: { fontSize: 10, color: 'rgba(255,255,255,0.9)' },
+  checkmark: { fontSize: 10, color: '#FFFFFF', fontWeight: FontWeight.bold },
 
   systemMsgContainer: { alignItems: 'center', marginVertical: Spacing.sm },
   systemBadge: {

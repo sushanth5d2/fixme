@@ -70,8 +70,12 @@ export function FixerConversationListScreen({ navigation }: any) {
 
   const renderItem = ({ item }: { item: Conversation }) => {
     // Find the other member (the customer)
-    const otherMember = item.members?.find((m) => m.user?.id !== user?.id) || item.members?.[0];
-    const otherName = otherMember?.user?.email?.split('@')[0] || 'Customer';
+    const myUserId = (user as any)?.userId || user?.id;
+    const otherMember =
+      item.members?.find((m: any) => m.role === 'CUSTOMER') ||
+      item.members?.find((m: any) => m.userId !== myUserId && m.user?.id !== myUserId) ||
+      item.members?.[0];
+    const otherName = otherMember?.user?.email ? otherMember.user.email.split('@')[0] : 'Customer';
 
     return (
       <TouchableOpacity
