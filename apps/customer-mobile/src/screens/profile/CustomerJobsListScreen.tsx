@@ -54,7 +54,7 @@ export function CustomerJobsListScreen({ navigation }: any) {
 
   const fetchJobs = useCallback(async () => {
     try {
-      const { data } = await api.get('/jobs/customer/mine');
+      const { data } = await api.get('/jobs/mine/customer');
       const raw = data?.data;
       const items: CustomerJob[] = Array.isArray(raw?.data)
         ? raw.data

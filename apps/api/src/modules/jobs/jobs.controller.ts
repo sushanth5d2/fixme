@@ -63,7 +63,7 @@ export class JobsController {
     return this.jobsService.schedule(userId, jobId, dto);
   }
 
-  @Get('mine/fixer')
+  @Get(['mine/fixer', 'fixer/mine'])
   @Roles(UserRole.FIXER)
   @ApiOperation({ summary: '[Fixer] List my assigned jobs' })
   @ApiQuery({ name: 'page', required: false, type: 'number' })
@@ -76,7 +76,7 @@ export class JobsController {
     return this.jobsService.getMyJobs(userId, 'fixer', Number(page), Math.min(Number(limit), 100));
   }
 
-  @Get('mine/customer')
+  @Get(['mine/customer', 'customer/mine'])
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: '[Customer] List my jobs' })
   @ApiQuery({ name: 'page', required: false, type: 'number' })
