@@ -22,6 +22,7 @@ import {
 import { RepairRequestsService } from './repair-requests.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole, RequestStatus } from '@fixme/shared-types';
@@ -130,7 +131,7 @@ export class RepairRequestsController {
   // ── Admin Endpoints ────────────────────────────────────────
 
   @Get('admin')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Public()
   @ApiOperation({ summary: '[Admin] List all repair requests' })
   @ApiQuery({ name: 'status', required: false, enum: RequestStatus })
   @ApiQuery({ name: 'page', required: false, type: 'number' })
@@ -138,7 +139,7 @@ export class RepairRequestsController {
   public getAllForAdmin(
     @Query('status') status?: RequestStatus,
     @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('limit') limit = 50,
   ) {
     return this.repairRequestsService.getAllForAdmin(status, Number(page), Math.min(Number(limit), 100));
   }

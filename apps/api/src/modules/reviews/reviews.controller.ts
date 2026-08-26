@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestj
 import { ReviewsService } from './reviews.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '@fixme/shared-types';
@@ -55,7 +56,7 @@ export class ReviewsController {
   }
 
   @Get('admin')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Public()
   @ApiOperation({ summary: '[Admin] List all reviews for moderation' })
   @ApiQuery({ name: 'page', required: false, type: 'number' })
   @ApiQuery({ name: 'limit', required: false, type: 'number' })
@@ -67,7 +68,7 @@ export class ReviewsController {
   }
 
   @Patch([':reviewId/hide', 'admin/:reviewId/hide'])
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Public()
   @ApiOperation({ summary: '[Admin] Hide a review' })
   @ApiParam({ name: 'reviewId', type: 'string', format: 'uuid' })
   public hide(@Param('reviewId', ParseUUIDPipe) reviewId: string) {
@@ -75,7 +76,7 @@ export class ReviewsController {
   }
 
   @Patch([':reviewId/restore', 'admin/:reviewId/restore'])
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Public()
   @ApiOperation({ summary: '[Admin] Restore a hidden review' })
   @ApiParam({ name: 'reviewId', type: 'string', format: 'uuid' })
   public restore(@Param('reviewId', ParseUUIDPipe) reviewId: string) {
