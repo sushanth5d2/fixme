@@ -385,9 +385,10 @@ export class FixersService implements OnModuleInit {
   public async listForAdmin(
     status?: FixerVerificationStatus,
     page = 1,
-    limit = 20,
+    limit = 50,
   ): Promise<{ data: FixerEntity[]; total: number; page: number; limit: number }> {
     const query = this.fixerRepo.createQueryBuilder('fixer');
+    query.leftJoinAndSelect('fixer.user', 'user');
     if (status) query.where('fixer.verificationStatus = :status', { status });
     query.orderBy('fixer.createdAt', 'DESC');
     query.skip((page - 1) * limit).take(limit);

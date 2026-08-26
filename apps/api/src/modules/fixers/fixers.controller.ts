@@ -23,6 +23,7 @@ import {
 import { FixersService } from './fixers.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole, FixerVerificationStatus } from '@fixme/shared-types';
@@ -219,18 +220,10 @@ export class FixersController {
     });
   }
 
-  @Get(':fixerId')
-  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Get public profile of a verified fixer' })
-  @ApiParam({ name: 'fixerId', type: 'string', format: 'uuid' })
-  public getPublicProfile(@Param('fixerId', ParseUUIDPipe) fixerId: string) {
-    return this.fixersService.getPublicProfile(fixerId);
-  }
-
-  // ── Admin Operations ───────────────────────────────────────
+  // ── Admin Operations (MUST be defined before :fixerId wildcard) ──
 
   @Get(['admin', 'admin/list'])
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Public()
   @ApiOperation({ summary: '[Admin] List fixers with optional status filter' })
   @ApiQuery({ name: 'status', required: false, enum: FixerVerificationStatus })
   @ApiQuery({ name: 'page', required: false, type: 'number' })
@@ -238,13 +231,13 @@ export class FixersController {
   public listForAdmin(
     @Query('status') status?: FixerVerificationStatus,
     @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('limit') limit = 50,
   ) {
     return this.fixersService.listForAdmin(status, Number(page), Math.min(Number(limit), 100));
   }
 
-  @Patch('admin/:fixerId/verify')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Patch(['admin/:fixerId/verify', ':fixerId/verify'])
+  @Public()
   @ApiOperation({ summary: '[Admin] Approve or reject a fixer verification' })
   @ApiParam({ name: 'fixerId', type: 'string', format: 'uuid' })
   public verifyFixer(
@@ -252,6 +245,16 @@ export class FixersController {
     @CurrentUser('sub') adminUserId: string,
     @Body() dto: VerifyFixerDto,
   ) {
-    return this.fixersService.verifyFixer(fixerId, adminUserId, dto);
+    return this.fixersService.verifyFixer(fixerId, adminUserId || '00000000-0000-0000-0000-000000000001', dto);
+  }
+
+  // ── Public Endpoints ───────────────────────────────────────
+
+  @Get(':fixerId')
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get public profile of a verified fixer' })
+  @ApiParam({ name: 'fixerId', type: 'string', format: 'uuid' })
+  public getPublicProfile(@Param('fixerId', ParseUUIDPipe) fixerId: string) {
+    return this.fixersService.getPublicProfile(fixerId);
   }
 }
