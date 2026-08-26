@@ -231,10 +231,9 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
     if (!job) return;
     setStartingChat(true);
     try {
-      const { data } = await api.post('/chat/conversations', {
-        jobId: job.id,
-        requestId: job.request?.id,
-      });
+      const payload: any = { jobId: job.id };
+      if (job.request?.id) payload.requestId = job.request.id;
+      const { data } = await api.post('/chat/conversations', payload);
       const conv = data?.data || data;
       if (conv?.id) {
         navigation.navigate('ChatRoom', {

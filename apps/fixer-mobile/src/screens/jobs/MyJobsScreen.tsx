@@ -125,10 +125,9 @@ export function MyJobsScreen({ navigation }: any) {
   const handleStartChat = async (job: Job) => {
     setStartingChat(job.id);
     try {
-      const { data } = await api.post('/chat/conversations', {
-        jobId: job.id,
-        requestId: job.request?.id,
-      });
+      const payload: any = { jobId: job.id };
+      if (job.request?.id) payload.requestId = job.request.id;
+      const { data } = await api.post('/chat/conversations', payload);
       const conv = data?.data || data;
       if (conv?.id) {
         navigation.navigate('ChatRoom', {
