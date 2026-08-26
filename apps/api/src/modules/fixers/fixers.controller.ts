@@ -163,6 +163,25 @@ export class FixersController {
     return this.fixersService.deleteMember(userId, memberId);
   }
 
+  @Patch('me/members/:memberId')
+  @Roles(UserRole.FIXER)
+  @ApiOperation({ summary: 'Update a team member details' })
+  @ApiParam({ name: 'memberId', type: 'string', format: 'uuid' })
+  public updateMember(
+    @CurrentUser('sub') userId: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+    @Body()
+    dto: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      profilePhotoKey?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    return this.fixersService.updateMember(userId, memberId, dto);
+  }
+
   @Patch('me/members/:memberId/password')
   @Roles(UserRole.FIXER)
   @ApiOperation({ summary: 'Reset or change password for a team member' })

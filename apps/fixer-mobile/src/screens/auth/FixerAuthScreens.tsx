@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  TouchableOpacity,
+  Modal,
+  ActivityIndicator,
+} from 'react-native';
 import { Button, Input, PasswordInput } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { useAuthStore } from '../../stores/auth.store';
@@ -10,6 +21,12 @@ export function FixerLoginScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const login = useAuthStore((s) => s.login);
+  const forgotPassword = useAuthStore((s) => s.forgotPassword);
+
+  // Forgot Password
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [sendingForgot, setSendingForgot] = useState(false);
 
   const handleLogin = async () => {
     if (!email.includes('@') || password.length < 6) return;
@@ -26,6 +43,32 @@ export function FixerLoginScreen({ navigation }: any) {
       Alert.alert('Login Failed', msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+    setSendingForgot(true);
+    try {
+      await forgotPassword(forgotEmail.trim().toLowerCase());
+      Alert.alert(
+        'Password Reset Requested',
+        `If an account exists with ${forgotEmail}, instructions or support contact will be sent. Note: For staff technicians, your workshop business owner can also reset your password immediately from "Manage Staff".`,
+      );
+      setForgotModalVisible(false);
+      setForgotEmail('');
+    } catch {
+      Alert.alert(
+        'Password Reset Requested',
+        `If an account exists with ${forgotEmail}, instructions will be sent.`,
+      );
+      setForgotModalVisible(false);
+      setForgotEmail('');
+    } finally {
+      setSendingForgot(false);
     }
   };
 
@@ -77,6 +120,16 @@ export function FixerLoginScreen({ navigation }: any) {
           onChangeText={setPassword}
         />
 
+        <TouchableOpacity
+          style={styles.forgotBtn}
+          onPress={() => {
+            setForgotEmail(email);
+            setForgotModalVisible(true);
+          }}
+        >
+          <Text style={styles.forgotText}>Forgot Password?</Text>
+        </TouchableOpacity>
+
         <Button
           title={loginType === 'owner' ? 'Sign In as Owner' : 'Sign In as Staff Member'}
           onPress={handleLogin}
@@ -101,6 +154,53 @@ export function FixerLoginScreen({ navigation }: any) {
             </Text>
           </View>
         )}
+
+        {/* Forgot Password Modal */}
+        <Modal
+          visible={forgotModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setForgotModalVisible(false)}
+        >
+          <View style={styles.backdrop}>
+            <View style={styles.popupCard}>
+              <Text style={styles.popupTitle}>🔑 Forgot Password</Text>
+              <Text style={styles.popupSubtitle}>
+                Enter your registered email address to receive password assistance:
+              </Text>
+
+              <Input
+                label="Registered Email"
+                value={forgotEmail}
+                onChangeText={setForgotEmail}
+                placeholder="you@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <View style={styles.popupActions}>
+                <TouchableOpacity
+                  style={styles.popupCancelBtn}
+                  onPress={() => setForgotModalVisible(false)}
+                >
+                  <Text style={styles.popupCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.popupSaveBtn}
+                  onPress={handleForgotPassword}
+                  disabled={sendingForgot}
+                >
+                  {sendingForgot ? (
+                    <ActivityIndicator size="small" color={Colors.white} />
+                  ) : (
+                    <Text style={styles.popupSaveText}>Send Request</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -405,4 +505,38 @@ const styles = StyleSheet.create({
     color: '#16A34A',
     fontWeight: FontWeight.semibold,
   },
+
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    marginBottom: Spacing.md,
+    marginTop: -Spacing.xs,
+    paddingVertical: 4,
+  },
+  forgotText: {
+    fontSize: FontSize.xs,
+    color: Colors.accent,
+    fontWeight: FontWeight.semibold,
+  },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.base },
+  popupCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    gap: Spacing.sm,
+  },
+  popupTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  popupSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginBottom: Spacing.xs, lineHeight: 18 },
+  popupActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm, marginTop: Spacing.sm },
+  popupCancelBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  popupCancelText: { fontSize: FontSize.sm, color: Colors.muted, fontWeight: FontWeight.semibold },
+  popupSaveBtn: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  popupSaveText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 });

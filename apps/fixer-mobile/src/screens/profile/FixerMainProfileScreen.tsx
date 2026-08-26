@@ -145,6 +145,12 @@ export function FixerMainProfileScreen({ navigation }: any) {
       subtitle: 'Operating locations and coverage distance',
       onPress: () => navigation.navigate('ManageAreas'),
     },
+    {
+      icon: '🔑',
+      title: 'Change Password',
+      subtitle: 'Update your workshop login password',
+      onPress: () => setPasswordModalVisible(true),
+    },
   ];
 
   const memberMenuItems = [

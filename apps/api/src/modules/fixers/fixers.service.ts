@@ -600,6 +600,48 @@ export class FixersService implements OnModuleInit {
     return { message: 'Password reset successfully' };
   }
 
+  public async updateMember(
+    fixerUserId: string,
+    memberId: string,
+    dto: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      profilePhotoKey?: string | null;
+      isActive?: boolean;
+    },
+  ): Promise<FixerMemberEntity> {
+    const fixer = await this.findFixerByUserOrFail(fixerUserId);
+    const member = await this.memberRepo.findOne({
+      where: { id: memberId, fixerId: fixer.id },
+    });
+    if (!member) throw new NotFoundException('Team member not found');
+
+    if (dto.fullName !== undefined) member.fullName = dto.fullName.trim();
+    if (dto.phone !== undefined) member.phone = dto.phone.trim();
+    if (dto.profilePhotoKey !== undefined) member.profilePhotoKey = dto.profilePhotoKey;
+    if (dto.isActive !== undefined) member.isActive = dto.isActive;
+
+    if (dto.email && dto.email.trim().toLowerCase() !== member.email) {
+      const emailNorm = dto.email.trim().toLowerCase();
+      const existingUser = await this.userRepo.findOne({ where: { email: emailNorm } });
+      if (existingUser && existingUser.id !== member.userId) {
+        throw new ConflictException('An account with this email address already exists');
+      }
+      member.email = emailNorm;
+      await this.userRepo.update(member.userId, { email: emailNorm });
+    }
+
+    if (dto.phone) {
+      const cleanMobile = dto.phone.replace(/\D/g, '').slice(-10);
+      await this.userRepo.update(member.userId, { mobile: cleanMobile });
+    }
+
+    await this.memberRepo.save(member);
+    this.logger.log(`Fixer member updated: ${member.id} (${member.fullName})`);
+    return member;
+  }
+
   public async getMyMemberProfile(memberUserId: string): Promise<any> {
     const member = await this.memberRepo.findOne({
       where: { userId: memberUserId },

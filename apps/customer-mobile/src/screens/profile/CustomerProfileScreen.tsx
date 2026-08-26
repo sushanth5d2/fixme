@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
-import { Button } from '../../components/ui';
+import { Button, Input } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { useAuthStore } from '../../stores/auth.store';
+import { api } from '../../services/api';
 
 interface MenuItem {
   icon: string;
@@ -21,6 +24,12 @@ interface MenuItem {
 export function CustomerProfileScreen({ navigation }: any) {
   const { user, logout } = useAuthStore();
 
+  // Change Password Modal
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -28,11 +37,32 @@ export function CustomerProfileScreen({ navigation }: any) {
     ]);
   };
 
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      Alert.alert('Invalid Password', 'Please enter your current password and a new password (min 6 characters).');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await api.post('/auth/password/change', { currentPassword, newPassword });
+      Alert.alert('Password Changed! 🎉', 'Your account password has been updated.');
+      setPasswordModalVisible(false);
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Current password is incorrect';
+      Alert.alert('Password Change Failed', msg);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const menuItems: MenuItem[] = [
     { icon: '👤', label: 'Edit Profile', onPress: () => navigation.navigate('EditProfile') },
     { icon: '📍', label: 'My Addresses', onPress: () => navigation.navigate('Addresses') },
     { icon: '🔧', label: 'My Jobs', onPress: () => navigation.navigate('MyJobs') },
     { icon: '🔔', label: 'Notifications', onPress: () => navigation.navigate('Notifications') },
+    { icon: '🔑', label: 'Change Password', onPress: () => setPasswordModalVisible(true) },
   ];
 
   return (
@@ -80,6 +110,57 @@ export function CustomerProfileScreen({ navigation }: any) {
         />
         <Text style={styles.version}>Fix Me v1.0.0</Text>
       </View>
+
+      {/* Change Password Modal */}
+      <Modal
+        visible={passwordModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.popupCard}>
+            <Text style={styles.popupTitle}>🔑 Change Login Password</Text>
+            <Text style={styles.popupSubtitle}>Enter your current and new password:</Text>
+
+            <Input
+              label="Current Password"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              placeholder="Enter current password"
+              secureTextEntry
+            />
+
+            <Input
+              label="New Password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="Min 6 characters"
+              secureTextEntry
+            />
+
+            <View style={styles.popupActions}>
+              <TouchableOpacity
+                style={styles.popupCancelBtn}
+                onPress={() => setPasswordModalVisible(false)}
+              >
+                <Text style={styles.popupCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.popupSaveBtn}
+                onPress={handleChangePassword}
+                disabled={savingPassword}
+              >
+                {savingPassword ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.popupSaveText}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -123,4 +204,26 @@ const styles = StyleSheet.create({
     gap: Spacing.md, alignItems: 'center',
   },
   version: { fontSize: FontSize.xs, color: Colors.muted },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.base },
+  popupCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    gap: Spacing.sm,
+  },
+  popupTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  popupSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginBottom: Spacing.xs },
+  popupActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm, marginTop: Spacing.sm },
+  popupCancelBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  popupCancelText: { fontSize: FontSize.sm, color: Colors.muted, fontWeight: FontWeight.semibold },
+  popupSaveBtn: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  popupSaveText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 });

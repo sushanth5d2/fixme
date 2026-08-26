@@ -47,6 +47,21 @@ export function FixerManageMembersScreen({ navigation }: any) {
     photo: '' as string,
   });
 
+  // Edit Member Modal
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedEditMember, setSelectedEditMember] = useState<FixerMember | null>(null);
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    photo: '' as string,
+    isActive: true,
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Photo Viewer Modal
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+
   // Password Reset Modal
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState<FixerMember | null>(null);
@@ -114,6 +129,28 @@ export function FixerManageMembersScreen({ navigation }: any) {
     }
   };
 
+  const handlePickEditPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant photo gallery permission to attach a technician photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const photoUri = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : asset.uri;
+      setEditForm((prev) => ({ ...prev, photo: photoUri }));
+    }
+  };
+
   const handleAddMember = async () => {
     if (!newMember.fullName.trim() || !newMember.email.trim() || !newMember.phone.trim() || !newMember.password) {
       Alert.alert('Required Fields', 'Please fill in full name, email, phone number, and initial password.');
@@ -141,6 +178,45 @@ export function FixerManageMembersScreen({ navigation }: any) {
       Alert.alert('Error', err?.response?.data?.message || 'Failed to add technician');
     } finally {
       setSavingMember(false);
+    }
+  };
+
+  const openEditMember = (member: FixerMember) => {
+    setSelectedEditMember(member);
+    setEditForm({
+      fullName: member.fullName || '',
+      email: member.email || '',
+      phone: member.phone || '',
+      photo: member.profilePhotoKey || '',
+      isActive: member.isActive !== false,
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEditMember = async () => {
+    if (!selectedEditMember) return;
+    if (!editForm.fullName.trim() || !editForm.email.trim() || !editForm.phone.trim()) {
+      Alert.alert('Required Fields', 'Please fill in full name, email, and phone.');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      await api.patch(`/fixers/me/members/${selectedEditMember.id}`, {
+        fullName: editForm.fullName.trim(),
+        email: editForm.email.trim().toLowerCase(),
+        phone: editForm.phone.trim(),
+        profilePhotoKey: editForm.photo || null,
+        isActive: editForm.isActive,
+      });
+      Alert.alert('Member Updated! 🎉', `${editForm.fullName}'s profile has been updated.`);
+      setEditModalVisible(false);
+      setSelectedEditMember(null);
+      fetchMembers();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to update technician details');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -192,24 +268,47 @@ export function FixerManageMembersScreen({ navigation }: any) {
   const renderMember = ({ item }: { item: FixerMember }) => (
     <View style={styles.memberCard}>
       <View style={styles.memberHeaderRow}>
-        {item.profilePhotoKey ? (
-          <Image source={{ uri: item.profilePhotoKey }} style={styles.avatarImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            if (item.profilePhotoKey) setSelectedPhoto(item.profilePhotoKey);
+          }}
+          style={styles.avatarWrapper}
+        >
+          {item.profilePhotoKey ? (
+            <View style={styles.avatarImgContainer}>
+              <Image source={{ uri: item.profilePhotoKey }} style={styles.avatarImage} resizeMode="cover" />
+              <View style={styles.zoomBadge}>
+                <Text style={styles.zoomText}>🔍 View</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
         <View style={styles.memberInfo}>
           <Text style={styles.memberName}>{item.fullName}</Text>
           <Text style={styles.memberContact}>📧 {item.email}</Text>
           <Text style={styles.memberContact}>📱 {item.phone}</Text>
         </View>
-        <View style={styles.activeBadge}>
-          <Text style={styles.activeBadgeText}>ACTIVE</Text>
+        <View style={[styles.activeBadge, !item.isActive && styles.inactiveBadge]}>
+          <Text style={[styles.activeBadgeText, !item.isActive && styles.inactiveBadgeText]}>
+            {item.isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+          </Text>
         </View>
       </View>
 
       <View style={styles.memberActionsRow}>
+        <TouchableOpacity
+          style={styles.editBtn}
+          onPress={() => openEditMember(item)}
+        >
+          <Text style={styles.editBtnText}>✏️ Edit</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.resetPassBtn}
           onPress={() => {
@@ -218,7 +317,7 @@ export function FixerManageMembersScreen({ navigation }: any) {
             setResetModalVisible(true);
           }}
         >
-          <Text style={styles.resetPassBtnText}>🔑 Reset Password</Text>
+          <Text style={styles.resetPassBtnText}>🔑 Password</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -419,6 +518,132 @@ export function FixerManageMembersScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Member Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalSafeArea}>
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>✏️ Edit Team Member</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Text style={styles.modalCloseText}>✕ Close</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalSubtitle}>
+                Update technician contact details, photo, and active status.
+              </Text>
+
+              {/* Photo Upload Section */}
+              <View style={styles.photoPickerSection}>
+                <Text style={styles.photoSectionLabel}>Technician Photo</Text>
+                <View style={styles.photoPickerRow}>
+                  {editForm.photo ? (
+                    <View style={styles.previewContainer}>
+                      <Image source={{ uri: editForm.photo }} style={styles.photoPreview} />
+                      <TouchableOpacity
+                        style={styles.removePhotoBtn}
+                        onPress={() => setEditForm((p) => ({ ...p, photo: '' }))}
+                      >
+                        <Text style={styles.removePhotoText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Text style={styles.placeholderIcon}>👤</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.photoActionButtons}>
+                    <TouchableOpacity style={styles.uploadPhotoBtn} onPress={handlePickEditPhoto}>
+                      <Text style={styles.uploadPhotoText}>📁 Choose New Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              <Input
+                label="Technician Full Name *"
+                value={editForm.fullName}
+                onChangeText={(v) => setEditForm((p) => ({ ...p, fullName: v }))}
+                placeholder="e.g. Ramesh Kumar"
+              />
+
+              <Input
+                label="Email Address (Login Username) *"
+                value={editForm.email}
+                onChangeText={(v) => setEditForm((p) => ({ ...p, email: v }))}
+                placeholder="ramesh@workshop.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <Input
+                label="Phone Number *"
+                value={editForm.phone}
+                onChangeText={(v) => setEditForm((p) => ({ ...p, phone: v }))}
+                placeholder="9876543210"
+                keyboardType="phone-pad"
+              />
+
+              {/* Status Toggle */}
+              <View style={styles.statusToggleContainer}>
+                <Text style={styles.statusToggleLabel}>Account Status:</Text>
+                <TouchableOpacity
+                  style={[styles.statusToggleBtn, editForm.isActive ? styles.statusBtnActive : styles.statusBtnInactive]}
+                  onPress={() => setEditForm((p) => ({ ...p, isActive: !p.isActive }))}
+                >
+                  <Text style={[styles.statusToggleText, editForm.isActive ? styles.statusTextActive : styles.statusTextInactive]}>
+                    {editForm.isActive ? '✅ Active Member' : '⏸️ Inactive (Login Disabled)'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBtnSection}>
+                <Button
+                  title="Save Changes"
+                  onPress={handleSaveEditMember}
+                  loading={savingEdit}
+                  size="lg"
+                />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Fullscreen Photo Lightbox Modal */}
+      <Modal
+        visible={!!selectedPhoto}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <View style={styles.photoModalBackdrop}>
+          <TouchableOpacity
+            style={styles.closePhotoBtn}
+            onPress={() => setSelectedPhoto(null)}
+          >
+            <Text style={styles.closePhotoText}>✕ Close</Text>
+          </TouchableOpacity>
+          {selectedPhoto ? (
+            <Image
+              source={{ uri: selectedPhoto }}
+              style={styles.fullscreenPhoto}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -465,26 +690,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.md,
   },
+  avatarWrapper: {
+    marginRight: Spacing.md,
+  },
+  avatarImgContainer: {
+    position: 'relative',
+  },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: Colors.accentSoft,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.accent,
   },
   avatarImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: Spacing.md,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#E5E7EB',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
+    borderWidth: 2,
+    borderColor: Colors.accent,
   },
+  zoomBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: Colors.white,
+  },
+  zoomText: { color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold },
   avatarText: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.accent },
   memberInfo: { flex: 1 },
   memberName: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
@@ -496,6 +737,10 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   activeBadgeText: { fontSize: 10, fontWeight: FontWeight.bold, color: '#16A34A' },
+  inactiveBadge: {
+    backgroundColor: '#FEE2E2',
+  },
+  inactiveBadgeText: { color: '#DC2626' },
 
   memberActionsRow: {
     flexDirection: 'row',
@@ -505,8 +750,19 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     gap: Spacing.sm,
   },
+  editBtn: {
+    flex: 1,
+    backgroundColor: '#EFF6FF',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  editBtnText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: '#1D4ED8' },
   resetPassBtn: {
-    flex: 1.2,
+    flex: 1.1,
     backgroundColor: '#F3F4F6',
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
@@ -517,7 +773,7 @@ const styles = StyleSheet.create({
   },
   resetPassBtnText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, color: Colors.text },
   deleteBtn: {
-    flex: 0.8,
+    flex: 0.9,
     backgroundColor: '#FEF2F2',
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
@@ -623,6 +879,46 @@ const styles = StyleSheet.create({
   },
   uploadCameraText: { color: Colors.text, fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
 
+  statusToggleContainer: {
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    gap: Spacing.xs,
+  },
+  statusToggleLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+  statusToggleBtn: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  statusBtnActive: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  statusBtnInactive: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  statusToggleText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+  },
+  statusTextActive: {
+    color: '#15803D',
+  },
+  statusTextInactive: {
+    color: '#B91C1C',
+  },
+
   modalBtnSection: { marginTop: Spacing.md },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.base },
@@ -646,4 +942,23 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   popupSaveText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+
+  photoModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenPhoto: { width: '92%', height: '82%' },
+  closePhotoBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    zIndex: 10,
+  },
+  closePhotoText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 });
