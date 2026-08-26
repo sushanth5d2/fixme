@@ -31,12 +31,20 @@ export class ComplaintsController {
   @Post()
   @Roles(UserRole.CUSTOMER, UserRole.FIXER)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'File a complaint about a job' })
+  @ApiOperation({ summary: 'File a complaint / dispute about a job' })
   public create(
     @CurrentUser('sub') userId: string,
     @Body() dto: CreateComplaintDto,
   ) {
     return this.complaintsService.create(userId, dto);
+  }
+
+  @Get(['job/:jobId', 'request/:jobId'])
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get dispute/complaint for a job or request' })
+  @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
+  public getByJobOrRequestId(@Param('jobId', ParseUUIDPipe) jobId: string) {
+    return this.complaintsService.getByJobOrRequestId(jobId);
   }
 
   @Get('mine')

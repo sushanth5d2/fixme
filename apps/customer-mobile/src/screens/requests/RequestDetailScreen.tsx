@@ -28,6 +28,26 @@ interface ExistingReview {
   createdAt: string;
 }
 
+interface ExistingDispute {
+  id: string;
+  reason: string;
+  description: string;
+  status: string;
+  adminNotes?: string | null;
+  resolution?: string | null;
+  createdAt: string;
+}
+
+const CUSTOMER_DISPUTE_REASONS = [
+  { id: 'POOR_SERVICE', label: 'Poor Service Quality / Issue Unresolved' },
+  { id: 'OVERCHARGING', label: 'Overcharging / Price Mismatch' },
+  { id: 'DEVICE_DAMAGE', label: 'Device Damaged During Repair' },
+  { id: 'WARRANTY_ISSUE', label: 'Warranty Claim Refused' },
+  { id: 'FIXER_DID_NOT_ARRIVE', label: 'Fixer Did Not Arrive' },
+  { id: 'UNPROFESSIONAL_BEHAVIOR', label: 'Unprofessional Behavior' },
+  { id: 'SUSPECTED_FRAUD', label: 'Suspected Fraud / Fake Parts' },
+];
+
 interface FixerMember {
   id: string;
   fullName: string;
@@ -106,13 +126,21 @@ export function RequestDetailScreen({ route, navigation }: any) {
   const [isEditingReview, setIsEditingReview] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
 
+  // Dispute & Complaint State
+  const [disputeModalVisible, setDisputeModalVisible] = useState(false);
+  const [existingDispute, setExistingDispute] = useState<ExistingDispute | null>(null);
+  const [disputeReason, setDisputeReason] = useState<string>('POOR_SERVICE');
+  const [disputeDesc, setDisputeDesc] = useState('');
+  const [submittingDispute, setSubmittingDispute] = useState(false);
+
   const fetchDetail = useCallback(async () => {
     try {
-      const [reqRes, quotesRes, jobsRes, reviewRes] = await Promise.all([
+      const [reqRes, quotesRes, jobsRes, reviewRes, complaintRes] = await Promise.all([
         api.get(`/repair-requests/mine/${requestId}`),
         api.get(`/quotes/request/${requestId}`).catch(() => ({ data: { data: [] } })),
         api.get('/jobs/mine/customer').catch(() => ({ data: { data: [] } })),
         api.get(`/reviews/request/${requestId}`).catch(() => null),
+        api.get(`/complaints/request/${requestId}`).catch(() => null),
       ]);
       const rawReq = reqRes?.data?.data || reqRes?.data;
       setRequest(rawReq);
@@ -133,12 +161,44 @@ export function RequestDetailScreen({ route, navigation }: any) {
         setRatingInput(revData.overallRating || revData.rating || 5);
         setCommentInput(revData.reviewText || revData.comment || '');
       }
+
+      const compData = complaintRes?.data?.data || complaintRes?.data;
+      if (compData && compData.id) {
+        setExistingDispute(compData);
+      }
     } catch (err) {
       console.error('[Fetch Request Detail Error]', err);
     } finally {
       setLoading(false);
     }
   }, [requestId]);
+
+  const handleSubmitDispute = async () => {
+    if (!disputeDesc.trim()) {
+      Alert.alert('Details Required', 'Please describe the problem or reason for this dispute.');
+      return;
+    }
+    setSubmittingDispute(true);
+    try {
+      const { data } = await api.post('/complaints', {
+        jobId: job?.id || requestId,
+        reason: disputeReason,
+        description: disputeDesc.trim(),
+      });
+      const saved = data?.data || data;
+      setExistingDispute(saved);
+      setDisputeModalVisible(false);
+      Alert.alert(
+        'Dispute Submitted ⚠️',
+        'Your dispute has been logged and escalated to the Admin Team for moderation. Our team will review and resolve this case.',
+      );
+      fetchDetail();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to submit dispute');
+    } finally {
+      setSubmittingDispute(false);
+    }
+  };
 
   const handleSubmitReview = async () => {
     if (ratingInput < 1) {
@@ -646,6 +706,44 @@ export function RequestDetailScreen({ route, navigation }: any) {
           </View>
         )}
 
+        {/* Dispute Status Banner */}
+        {(existingDispute || request.status === 'DISPUTED' || job?.status === 'DISPUTED') && (
+          <View style={styles.disputeActiveBanner}>
+            <View style={styles.disputeBannerHeader}>
+              <Text style={styles.disputeBannerTitle}>⚠️ Dispute Logged</Text>
+              <View style={styles.disputeStatusTag}>
+                <Text style={styles.disputeStatusTagText}>{existingDispute?.status || 'UNDER_REVIEW'}</Text>
+              </View>
+            </View>
+            <Text style={styles.disputeReasonText}>
+              Reason: {existingDispute?.reason?.replace(/_/g, ' ') || 'Service Issue'}
+            </Text>
+            {existingDispute?.description ? (
+              <Text style={styles.disputeDescText}>"{existingDispute.description}"</Text>
+            ) : null}
+            {existingDispute?.adminNotes ? (
+              <View style={styles.adminNoteBox}>
+                <Text style={styles.adminNoteTitle}>Admin Note:</Text>
+                <Text style={styles.adminNoteText}>{existingDispute.adminNotes}</Text>
+              </View>
+            ) : (
+              <Text style={styles.disputeSubtext}>
+                Our administrative team is moderating this dispute and coordinating with both parties for resolution.
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Raise Dispute Button (Available if not already in dispute and job has been assigned/completed) */}
+        {!existingDispute && request.status !== 'DISPUTED' && job?.status !== 'DISPUTED' && (job || ['ASSIGNED', 'FIXER_ON_THE_WAY', 'DEVICE_RECEIVED', 'DIAGNOSING', 'REPAIR_IN_PROGRESS', 'READY_FOR_DELIVERY', 'COMPLETED'].includes(request.status)) && (
+          <TouchableOpacity
+            style={styles.raiseDisputeBtn}
+            onPress={() => setDisputeModalVisible(true)}
+          >
+            <Text style={styles.raiseDisputeText}>⚠️ Raise Dispute / Report Issue</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Cancel Request Option */}
         {!isCancelled && ['OPEN', 'QUOTED'].includes(request.status) && (
           <TouchableOpacity style={styles.cancelRequestBtn} onPress={handleCancel}>
@@ -653,6 +751,71 @@ export function RequestDetailScreen({ route, navigation }: any) {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Raise Dispute Modal */}
+      <Modal
+        visible={disputeModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDisputeModalVisible(false)}
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.disputeModalCard}>
+            <Text style={styles.disputeModalTitle}>⚠️ Report Issue / Raise Dispute</Text>
+            <Text style={styles.disputeModalSubtitle}>
+              Please select the primary issue and explain the problem. Our admin team will investigate and intervene.
+            </Text>
+
+            <Text style={styles.disputeLabel}>Select Dispute Reason:</Text>
+            <ScrollView style={styles.reasonsList} nestedScrollEnabled>
+              {CUSTOMER_DISPUTE_REASONS.map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={[styles.reasonOption, disputeReason === r.id && styles.reasonOptionActive]}
+                  onPress={() => setDisputeReason(r.id)}
+                >
+                  <Text style={[styles.reasonOptionText, disputeReason === r.id && styles.reasonOptionTextActive]}>
+                    {disputeReason === r.id ? '● ' : '○ '}{r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={[styles.disputeLabel, { marginTop: Spacing.sm }]}>Explain the Problem in Detail:</Text>
+            <TextInput
+              style={styles.disputeTextInput}
+              placeholder="Describe what happened (e.g. fixer did not fix the problem, requested extra cash, damaged component)..."
+              placeholderTextColor={Colors.muted}
+              value={disputeDesc}
+              onChangeText={setDisputeDesc}
+              multiline
+              numberOfLines={4}
+            />
+
+            <View style={styles.popupActions}>
+              <TouchableOpacity
+                style={styles.cancelPopupBtn}
+                onPress={() => setDisputeModalVisible(false)}
+                disabled={submittingDispute}
+              >
+                <Text style={styles.cancelPopupText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.submitDisputeBtn}
+                onPress={handleSubmitDispute}
+                disabled={submittingDispute}
+              >
+                {submittingDispute ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.submitDisputeText}>Submit Dispute ⚠️</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Full-Screen Photo Modal */}
       <Modal visible={!!selectedPhoto} transparent={false} animationType="fade" onRequestClose={() => setSelectedPhoto(null)}>
@@ -1027,6 +1190,171 @@ const styles = StyleSheet.create({
   submitReviewText: {
     color: Colors.white,
     fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+  },
+
+  // Dispute Banner & Modal Styles
+  disputeActiveBanner: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    gap: Spacing.xs,
+  },
+  disputeBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  disputeBannerTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  disputeStatusTag: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  disputeStatusTagText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: '#B91C1C',
+  },
+  disputeReasonText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: '#991B1B',
+  },
+  disputeDescText: {
+    fontSize: FontSize.xs,
+    color: Colors.text,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  disputeSubtext: {
+    fontSize: FontSize.xs,
+    color: Colors.muted,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  adminNoteBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    marginTop: 4,
+  },
+  adminNoteTitle: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  adminNoteText: {
+    fontSize: FontSize.xs,
+    color: Colors.text,
+    marginTop: 2,
+  },
+
+  raiseDisputeBtn: {
+    backgroundColor: '#FFF1F2',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+  },
+  raiseDisputeText: {
+    color: '#E11D48',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+  },
+
+  disputeModalCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 450,
+    gap: Spacing.xs,
+  },
+  disputeModalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  disputeModalSubtitle: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    lineHeight: 16,
+  },
+  disputeLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+  reasonsList: {
+    maxHeight: 160,
+    backgroundColor: '#F9FAFB',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    padding: Spacing.xs,
+  },
+  reasonOption: {
+    paddingVertical: Spacing.xs + 2,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  reasonOptionActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  reasonOptionText: {
+    fontSize: FontSize.xs,
+    color: Colors.text,
+  },
+  reasonOptionTextActive: {
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  disputeTextInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    padding: Spacing.md,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlignVertical: 'top',
+    minHeight: 80,
+  },
+  cancelPopupBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    justifyContent: 'center',
+  },
+  cancelPopupText: {
+    fontSize: FontSize.sm,
+    color: Colors.muted,
+    fontWeight: FontWeight.semibold,
+  },
+  submitDisputeBtn: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitDisputeText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
   },
 });

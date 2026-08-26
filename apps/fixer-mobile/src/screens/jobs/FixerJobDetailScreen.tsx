@@ -89,6 +89,14 @@ const STATUS_LABELS: Record<string, string> = {
   DISPUTED: 'Disputed',
 };
 
+const FIXER_DISPUTE_REASONS = [
+  { id: 'PAYMENT_DISPUTE', label: 'Payment Dispute / Payment Not Received' },
+  { id: 'CUSTOMER_NO_SHOW', label: 'Customer Not Available / No Response' },
+  { id: 'ABUSIVE_BEHAVIOR', label: 'Abusive or Threatening Behavior' },
+  { id: 'FAKE_CUSTOMER', label: 'Fake Request / Misleading Device Details' },
+  { id: 'FALSE_COMPLAINT', label: 'False or Malicious Customer Claim' },
+];
+
 export function FixerJobDetailScreen({ route, navigation }: any) {
   const { jobId } = route.params;
   const { user } = useAuthStore();
@@ -98,6 +106,13 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [startingChat, setStartingChat] = useState(false);
+
+  // Dispute State
+  const [disputeModalVisible, setDisputeModalVisible] = useState(false);
+  const [existingDispute, setExistingDispute] = useState<any>(null);
+  const [disputeReason, setDisputeReason] = useState<string>('PAYMENT_DISPUTE');
+  const [disputeDesc, setDisputeDesc] = useState('');
+  const [submittingDispute, setSubmittingDispute] = useState(false);
 
   // Assign Member
   const [members, setMembers] = useState<FixerMember[]>([]);
@@ -116,10 +131,44 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
 
   const fetchJob = async () => {
     try {
-      const { data } = await api.get(`/jobs/${jobId}`);
-      setJob(data.data || data);
+      const [jobRes, compRes] = await Promise.all([
+        api.get(`/jobs/${jobId}`),
+        api.get(`/complaints/job/${jobId}`).catch(() => null),
+      ]);
+      setJob(jobRes?.data?.data || jobRes?.data);
+      const cData = compRes?.data?.data || compRes?.data;
+      if (cData && cData.id) {
+        setExistingDispute(cData);
+      }
     } catch {} finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmitDispute = async () => {
+    if (!disputeDesc.trim()) {
+      Alert.alert('Details Required', 'Please provide a clear description for this dispute.');
+      return;
+    }
+    setSubmittingDispute(true);
+    try {
+      const { data } = await api.post('/complaints', {
+        jobId,
+        reason: disputeReason,
+        description: disputeDesc.trim(),
+      });
+      const saved = data?.data || data;
+      setExistingDispute(saved);
+      setDisputeModalVisible(false);
+      Alert.alert(
+        'Dispute Submitted ⚠️',
+        'Your dispute has been logged and escalated to the Admin Team for investigation.',
+      );
+      fetchJob();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to submit dispute');
+    } finally {
+      setSubmittingDispute(false);
     }
   };
 
@@ -299,6 +348,34 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
             <Text style={styles.warrantyBadge}>{job.warrantyDays} Days Warranty Active</Text>
           ) : null}
         </View>
+
+        {/* Dispute Status Banner */}
+        {(existingDispute || job.status === 'DISPUTED') && (
+          <View style={styles.disputeActiveBanner}>
+            <View style={styles.disputeBannerHeader}>
+              <Text style={styles.disputeBannerTitle}>⚠️ Job Under Dispute</Text>
+              <View style={styles.disputeStatusTag}>
+                <Text style={styles.disputeStatusTagText}>{existingDispute?.status || 'UNDER_REVIEW'}</Text>
+              </View>
+            </View>
+            <Text style={styles.disputeReasonText}>
+              Reason: {existingDispute?.reason?.replace(/_/g, ' ') || 'Dispute Logged'}
+            </Text>
+            {existingDispute?.description ? (
+              <Text style={styles.disputeDescText}>"{existingDispute.description}"</Text>
+            ) : null}
+            {existingDispute?.adminNotes ? (
+              <View style={styles.adminNoteBox}>
+                <Text style={styles.adminNoteTitle}>Admin Note:</Text>
+                <Text style={styles.adminNoteText}>{existingDispute.adminNotes}</Text>
+              </View>
+            ) : (
+              <Text style={styles.disputeSubtext}>
+                The administrator team is moderating this dispute. You may be contacted for information.
+              </Text>
+            )}
+          </View>
+        )}
 
         {/* Revision Status Alert */}
         {job.revisionStatus === 'PENDING' && (
@@ -507,6 +584,16 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
           </TouchableOpacity>
         )}
 
+        {/* Raise Dispute / Report Customer Action */}
+        {!existingDispute && job.status !== 'DISPUTED' && !['CANCELLED'].includes(job.status) && (
+          <TouchableOpacity
+            style={styles.raiseDisputeBtn}
+            onPress={() => setDisputeModalVisible(true)}
+          >
+            <Text style={styles.raiseDisputeText}>⚠️ Report Customer / File Dispute</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Status Timeline */}
         {job.statusHistory?.length > 0 && (
           <View style={styles.section}>
@@ -533,6 +620,71 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
           </View>
         )}
       </ScrollView>
+
+      {/* Fixer Dispute Modal */}
+      <Modal
+        visible={disputeModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDisputeModalVisible(false)}
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.disputeModalCard}>
+            <Text style={styles.disputeModalTitle}>⚠️ Report Customer / Dispute</Text>
+            <Text style={styles.disputeModalSubtitle}>
+              Select the reason for dispute. Our admin team will investigate and moderate.
+            </Text>
+
+            <Text style={styles.disputeLabel}>Dispute Reason:</Text>
+            <ScrollView style={styles.reasonsList} nestedScrollEnabled>
+              {FIXER_DISPUTE_REASONS.map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={[styles.reasonOption, disputeReason === r.id && styles.reasonOptionActive]}
+                  onPress={() => setDisputeReason(r.id)}
+                >
+                  <Text style={[styles.reasonOptionText, disputeReason === r.id && styles.reasonOptionTextActive]}>
+                    {disputeReason === r.id ? '● ' : '○ '}{r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={[styles.disputeLabel, { marginTop: Spacing.sm }]}>Explanation & Context:</Text>
+            <TextInput
+              style={styles.disputeTextInput}
+              placeholder="Describe the issue (e.g. customer refused payment, abusive communication, customer unreachable)..."
+              placeholderTextColor={Colors.muted}
+              value={disputeDesc}
+              onChangeText={setDisputeDesc}
+              multiline
+              numberOfLines={4}
+            />
+
+            <View style={styles.popupActions}>
+              <TouchableOpacity
+                style={styles.cancelPopupBtn}
+                onPress={() => setDisputeModalVisible(false)}
+                disabled={submittingDispute}
+              >
+                <Text style={styles.cancelPopupText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.submitDisputeBtn}
+                onPress={handleSubmitDispute}
+                disabled={submittingDispute}
+              >
+                {submittingDispute ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.submitDisputeText}>Submit Dispute ⚠️</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Assign Member Modal */}
       <Modal
@@ -1005,4 +1157,171 @@ const styles = StyleSheet.create({
   photoModalCloseText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#EF4444' },
   photoModalContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   fullPhoto: { width: '100%', height: '100%' },
+
+  // Dispute Banner & Modal Styles
+  disputeActiveBanner: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  disputeBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  disputeBannerTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  disputeStatusTag: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  disputeStatusTagText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: '#B91C1C',
+  },
+  disputeReasonText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: '#991B1B',
+  },
+  disputeDescText: {
+    fontSize: FontSize.xs,
+    color: Colors.text,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  disputeSubtext: {
+    fontSize: FontSize.xs,
+    color: Colors.muted,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  adminNoteBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    marginTop: 4,
+  },
+  adminNoteTitle: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  adminNoteText: {
+    fontSize: FontSize.xs,
+    color: Colors.text,
+    marginTop: 2,
+  },
+
+  raiseDisputeBtn: {
+    backgroundColor: '#FFF1F2',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    marginBottom: Spacing.sm,
+  },
+  raiseDisputeText: {
+    color: '#E11D48',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+  },
+
+  disputeModalCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 450,
+    gap: Spacing.xs,
+  },
+  disputeModalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  disputeModalSubtitle: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    lineHeight: 16,
+  },
+  disputeLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+  reasonsList: {
+    maxHeight: 160,
+    backgroundColor: '#F9FAFB',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    padding: Spacing.xs,
+  },
+  reasonOption: {
+    paddingVertical: Spacing.xs + 2,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  reasonOptionActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  reasonOptionText: {
+    fontSize: FontSize.xs,
+    color: Colors.text,
+  },
+  reasonOptionTextActive: {
+    fontWeight: FontWeight.bold,
+    color: '#DC2626',
+  },
+  disputeTextInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    padding: Spacing.md,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlignVertical: 'top',
+    minHeight: 80,
+  },
+  cancelPopupBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    justifyContent: 'center',
+  },
+  cancelPopupText: {
+    fontSize: FontSize.sm,
+    color: Colors.muted,
+    fontWeight: FontWeight.semibold,
+  },
+  submitDisputeBtn: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitDisputeText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+  },
 });
