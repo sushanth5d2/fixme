@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   Image,
   StyleSheet,
   ScrollView,
@@ -88,6 +89,7 @@ export function HomeScreen({ navigation }: Props) {
   const [recentRequests, setRecentRequests] = useState<MyRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -121,12 +123,7 @@ export function HomeScreen({ navigation }: Props) {
           : [];
         setRecentRequests(reqList);
       }
-    } catch {
-      // Retain fallback categories
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    } catch {}
   }, []);
 
   useFocusEffect(
@@ -138,7 +135,18 @@ export function HomeScreen({ navigation }: Props) {
   const onRefresh = () => {
     setRefreshing(true);
     fetchData();
+    setRefreshing(false);
   };
+
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return categories;
+    const q = searchQuery.toLowerCase().trim();
+    return categories.filter(
+      (cat) =>
+        cat.name.toLowerCase().includes(q) ||
+        cat.slug.toLowerCase().includes(q)
+    );
+  }, [categories, searchQuery]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -170,37 +178,76 @@ export function HomeScreen({ navigation }: Props) {
       <View style={styles.header}>
         <Text style={styles.greeting}>Hello! 👋</Text>
         <Text style={styles.headerTitle}>What needs fixing?</Text>
+
+        {/* Search Bar for Device Types */}
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            placeholder="Search device type, appliance, electronics..."
+            placeholderTextColor="rgba(255,255,255,0.6)"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={styles.searchInput}
+            clearButtonMode="while-editing"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+              <Text style={styles.clearSearchText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Device Categories */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Select Device Type</Text>
-        <View style={styles.categoryGrid}>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={styles.categoryCard}
-              activeOpacity={0.7}
-              onPress={() =>
-                navigation.navigate('CreateRequest', {
-                  categoryId: cat.id,
-                  categoryName: cat.name,
-                })
-              }
-            >
-              {cat.iconKey && (cat.iconKey.startsWith('http') || cat.iconKey.startsWith('data:')) ? (
-                <Image source={{ uri: cat.iconKey }} style={styles.categoryLogoImage} />
-              ) : (
-                <Text style={styles.categoryIcon}>
-                  {CATEGORY_ICONS[cat.slug] || '🔧'}
-                </Text>
-              )}
-              <Text style={styles.categoryName} numberOfLines={1}>
-                {cat.name}
-              </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {searchQuery ? `Matching Types (${filteredCategories.length})` : 'Select Device Type'}
+          </Text>
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Text style={styles.seeAll}>Show All</Text>
             </TouchableOpacity>
-          ))}
+          ) : null}
         </View>
+
+        {filteredCategories.length === 0 ? (
+          <View style={styles.noCategoriesBox}>
+            <Text style={styles.noCategoriesIcon}>🔍</Text>
+            <Text style={styles.noCategoriesTitle}>No device type found</Text>
+            <Text style={styles.noCategoriesSubtitle}>No categories match "{searchQuery}"</Text>
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearFilterBtn}>
+              <Text style={styles.clearFilterText}>Clear Search</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.categoryGrid}>
+            {filteredCategories.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={styles.categoryCard}
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate('CreateRequest', {
+                    categoryId: cat.id,
+                    categoryName: cat.name,
+                  })
+                }
+              >
+                {cat.iconKey && (cat.iconKey.startsWith('http') || cat.iconKey.startsWith('data:')) ? (
+                  <Image source={{ uri: cat.iconKey }} style={styles.categoryLogoImage} />
+                ) : (
+                  <Text style={styles.categoryIcon}>
+                    {CATEGORY_ICONS[cat.slug] || '🔧'}
+                  </Text>
+                )}
+                <Text style={styles.categoryName} numberOfLines={1}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Recent Requests */}
@@ -271,6 +318,55 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: Colors.white,
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginTop: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: Spacing.xs,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.white,
+    padding: 0,
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+  clearSearchText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: FontWeight.bold,
+  },
+
+  noCategoriesBox: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    marginTop: Spacing.xs,
+  },
+  noCategoriesIcon: { fontSize: 32, marginBottom: Spacing.xs },
+  noCategoriesTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  noCategoriesSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2, marginBottom: Spacing.md },
+  clearFilterBtn: {
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+  },
+  clearFilterText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent },
 
   section: {
     paddingHorizontal: Spacing.xl,

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
@@ -21,8 +22,9 @@ import { api } from '../../services/api';
 interface FixerMember {
   id: string;
   fullName: string;
-  phone: string;
   email: string;
+  phone: string;
+  profilePhotoKey?: string | null;
 }
 
 interface JobDetail {
@@ -101,6 +103,7 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
   const [members, setMembers] = useState<FixerMember[]>([]);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
   // Quote Revision
   const [revisionModalVisible, setRevisionModalVisible] = useState(false);
@@ -360,11 +363,15 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
 
           {job.assignedMember ? (
             <View style={styles.technicianRow}>
-              <View style={styles.technicianAvatar}>
-                <Text style={styles.technicianAvatarText}>
-                  {job.assignedMember.fullName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              {job.assignedMember.profilePhotoKey ? (
+                <Image source={{ uri: job.assignedMember.profilePhotoKey }} style={styles.technicianAvatarImg} />
+              ) : (
+                <View style={styles.technicianAvatar}>
+                  <Text style={styles.technicianAvatarText}>
+                    {job.assignedMember.fullName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
               <View style={styles.technicianInfo}>
                 <Text style={styles.technicianName}>{job.assignedMember.fullName}</Text>
                 <Text style={styles.technicianPhone}>📱 {job.assignedMember.phone} · 📧 {job.assignedMember.email}</Text>
@@ -548,14 +555,38 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
             </Text>
 
             {/* Clear assignment option */}
-            {job.assignedMemberId && (
+            {(job.assignedMemberId || job.assignedMember) && (
               <TouchableOpacity
                 style={styles.clearAssignBtn}
                 onPress={() => handleAssignMember(null)}
                 disabled={assigning}
               >
-                <Text style={styles.clearAssignText}>✕ Clear Assigned Technician</Text>
+                {assigning ? (
+                  <ActivityIndicator size="small" color="#DC2626" />
+                ) : (
+                  <Text style={styles.clearAssignText}>✕ Clear Assigned Technician</Text>
+                )}
               </TouchableOpacity>
+            )}
+
+            {/* Search Technician Field */}
+            {members.length > 0 && (
+              <View style={styles.searchMemberWrapper}>
+                <Text style={styles.searchMemberIcon}>🔍</Text>
+                <TextInput
+                  placeholder="Search technician by name, phone, email..."
+                  placeholderTextColor={Colors.muted}
+                  value={memberSearchQuery}
+                  onChangeText={setMemberSearchQuery}
+                  style={styles.searchMemberInput}
+                  clearButtonMode="while-editing"
+                />
+                {memberSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setMemberSearchQuery('')} style={styles.clearSearchBtn}>
+                    <Text style={styles.clearSearchBtnText}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
 
             {members.length === 0 ? (
@@ -571,32 +602,46 @@ export function FixerJobDetailScreen({ route, navigation }: any) {
                 </TouchableOpacity>
               </View>
             ) : (
-              members.map((m) => {
-                const isSelected = job.assignedMemberId === m.id;
-                return (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={[styles.memberSelectCard, isSelected && styles.memberSelectCardSelected]}
-                    onPress={() => handleAssignMember(m.id)}
-                    disabled={assigning}
-                  >
-                    <View style={styles.technicianAvatar}>
-                      <Text style={styles.technicianAvatarText}>
-                        {m.fullName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.technicianName}>{m.fullName}</Text>
-                      <Text style={styles.technicianPhone}>📱 {m.phone}</Text>
-                    </View>
-                    {isSelected ? (
-                      <Text style={styles.selectedCheck}>✓ Assigned</Text>
-                    ) : (
-                      <Text style={styles.selectBtnText}>Assign →</Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })
+              members
+                .filter((m) => {
+                  if (!memberSearchQuery.trim()) return true;
+                  const query = memberSearchQuery.toLowerCase();
+                  return (
+                    m.fullName.toLowerCase().includes(query) ||
+                    (m.phone && m.phone.includes(query)) ||
+                    (m.email && m.email.toLowerCase().includes(query))
+                  );
+                })
+                .map((m) => {
+                  const isSelected = job.assignedMemberId === m.id || job.assignedMember?.id === m.id;
+                  return (
+                    <TouchableOpacity
+                      key={m.id}
+                      style={[styles.memberSelectCard, isSelected && styles.memberSelectCardSelected]}
+                      onPress={() => handleAssignMember(m.id)}
+                      disabled={assigning}
+                    >
+                      {m.profilePhotoKey ? (
+                        <Image source={{ uri: m.profilePhotoKey }} style={styles.technicianAvatarImg} />
+                      ) : (
+                        <View style={styles.technicianAvatar}>
+                          <Text style={styles.technicianAvatarText}>
+                            {m.fullName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.memberInfo}>
+                        <Text style={styles.technicianName}>{m.fullName}</Text>
+                        <Text style={styles.technicianPhone}>📱 {m.phone}</Text>
+                      </View>
+                      {isSelected ? (
+                        <Text style={styles.selectedCheck}>✓ Assigned</Text>
+                      ) : (
+                        <Text style={styles.selectBtnText}>Assign →</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
             )}
           </ScrollView>
         </SafeAreaView>
@@ -782,9 +827,9 @@ const styles = StyleSheet.create({
 
   technicianRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.xs },
   technicianAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.accentSoft,
     justifyContent: 'center',
     alignItems: 'center',
@@ -792,11 +837,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.accent,
   },
+  technicianAvatarImg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: Spacing.md,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+  },
   technicianAvatarText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.accent },
   technicianInfo: { flex: 1 },
   technicianName: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text },
   technicianPhone: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
   unassignedText: { fontSize: FontSize.xs, color: Colors.muted, fontStyle: 'italic', marginTop: 4 },
+
+  searchMemberWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    marginBottom: Spacing.xs,
+  },
+  searchMemberIcon: { fontSize: 14, marginRight: Spacing.xs },
+  searchMemberInput: { flex: 1, fontSize: FontSize.sm, color: Colors.text, padding: 0 },
+  clearSearchBtn: { padding: 4 },
+  clearSearchBtnText: { fontSize: 12, color: Colors.muted, fontWeight: FontWeight.bold },
 
   timelineItem: { flexDirection: 'row', marginBottom: Spacing.md },
   timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.accent, marginTop: 5, marginRight: Spacing.md },

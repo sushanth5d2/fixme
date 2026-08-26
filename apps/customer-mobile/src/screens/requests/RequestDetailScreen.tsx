@@ -318,11 +318,18 @@ export function RequestDetailScreen({ route, navigation }: any) {
             </View>
 
             <View style={styles.technicianRow}>
-              <View style={styles.technicianAvatar}>
-                <Text style={styles.technicianAvatarText}>
-                  {job.assignedMember.fullName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              {job.assignedMember.profilePhotoKey ? (
+                <Image
+                  source={{ uri: job.assignedMember.profilePhotoKey }}
+                  style={styles.technicianAvatarImg}
+                />
+              ) : (
+                <View style={styles.technicianAvatar}>
+                  <Text style={styles.technicianAvatarText}>
+                    {job.assignedMember.fullName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
               <View style={styles.technicianInfo}>
                 <Text style={styles.technicianName}>{job.assignedMember.fullName}</Text>
                 <Text style={styles.technicianRole}>Workshop Technician</Text>
@@ -520,11 +527,18 @@ export function RequestDetailScreen({ route, navigation }: any) {
         <View style={styles.backdrop}>
           <View style={styles.popupCard}>
             <View style={styles.techProfileHeader}>
-              <View style={styles.largeAvatar}>
-                <Text style={styles.largeAvatarText}>
-                  {job?.assignedMember?.fullName?.charAt(0).toUpperCase() || '🔧'}
-                </Text>
-              </View>
+              {job?.assignedMember?.profilePhotoKey ? (
+                <Image
+                  source={{ uri: job.assignedMember.profilePhotoKey }}
+                  style={styles.largeAvatarImg}
+                />
+              ) : (
+                <View style={styles.largeAvatar}>
+                  <Text style={styles.largeAvatarText}>
+                    {job?.assignedMember?.fullName?.charAt(0).toUpperCase() || '🔧'}
+                  </Text>
+                </View>
+              )}
               <Text style={styles.techProfileName}>{job?.assignedMember?.fullName}</Text>
               <Text style={styles.techProfileRole}>Assigned Workshop Technician</Text>
             </View>
@@ -626,6 +640,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#93C5FD',
   },
+  technicianAvatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: Spacing.md,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+  },
   technicianAvatarText: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#1D4ED8' },
   technicianInfo: { flex: 1 },
   technicianName: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text },
@@ -691,6 +714,7 @@ const styles = StyleSheet.create({
   popupCard: { backgroundColor: Colors.white, borderRadius: BorderRadius.lg, padding: Spacing.lg, width: '100%', maxWidth: 400, gap: Spacing.md },
   techProfileHeader: { alignItems: 'center', gap: Spacing.xs },
   largeAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#DBEAFE', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#3B82F6' },
+  largeAvatarImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#E5E7EB', borderWidth: 2, borderColor: '#3B82F6' },
   largeAvatarText: { fontSize: 28, fontWeight: FontWeight.bold, color: '#1D4ED8' },
   techProfileName: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
   techProfileRole: { fontSize: FontSize.xs, color: Colors.muted },

@@ -145,13 +145,17 @@ export class JobsService {
           where: { id: memberId, fixerId: job.fixerId },
         });
       if (!member) throw new NotFoundException('Member not found in your team');
+      job.assignedMember = member;
       job.assignedMemberId = member.id;
+      await this.jobRepo.save(job);
+      this.logger.log(`Job ${jobId} assigned to member: ${member.fullName} (${member.id})`);
     } else {
+      job.assignedMember = null;
       job.assignedMemberId = null;
+      await this.jobRepo.update(jobId, { assignedMemberId: null });
+      this.logger.log(`Job ${jobId} technician assignment cleared`);
     }
 
-    await this.jobRepo.save(job);
-    this.logger.log(`Job ${jobId} assigned to member: ${memberId || 'none'}`);
     return this.getJobById(userId, jobId);
   }
 
