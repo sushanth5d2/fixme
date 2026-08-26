@@ -8,11 +8,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { JobStatus, ReviewStatus } from '@fixme/shared-types';
+import { JobStatus, ReviewStatus, NotificationType } from '@fixme/shared-types';
 import { ReviewEntity } from './review.entity';
 import { JobEntity } from '../jobs/job.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
 import { CustomerEntity } from '../customers/customer.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateReviewDto } from './dto/review.dto';
 
 @Injectable()
@@ -31,6 +32,8 @@ export class ReviewsService {
 
     @InjectRepository(CustomerEntity)
     private readonly customerRepo: Repository<CustomerEntity>,
+
+    private readonly notificationsService: NotificationsService,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -119,6 +122,20 @@ export class ReviewsService {
         averageRating: parseFloat(avg) || 0,
         totalReviews: parseInt(count, 10) || 0,
       });
+
+      // Notify fixer about the review
+      try {
+        const fixer = await manager.getRepository(FixerEntity).findOne({ where: { id: job.fixerId } });
+        if (fixer?.userId) {
+          await this.notificationsService.create({
+            userId: fixer.userId,
+            type: NotificationType.REVIEW_RECEIVED,
+            title: '⭐ New Customer Review',
+            body: `You received a ★ ${ratingVal}.0 rating from a customer!`,
+            data: { reviewId: review.id, jobId: job.id, rating: ratingVal },
+          });
+        }
+      } catch (err: any) {}
 
       return review;
     });

@@ -65,11 +65,20 @@ export function RequestFeedScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
 
   const fetchFeed = useCallback(async () => {
     try {
-      const { data } = await api.get('/repair-requests/feed?limit=50');
-      const raw = data?.data;
+      const [feedRes, notifRes] = await Promise.all([
+        api.get('/repair-requests/feed?limit=50').catch(() => null),
+        api.get('/notifications/unread-count').catch(() => null),
+      ]);
+
+      if (notifRes?.data) {
+        setUnreadNotifsCount(notifRes.data?.data?.count ?? notifRes.data?.count ?? 0);
+      }
+
+      const raw = feedRes?.data?.data;
       const items: FeedRequest[] = Array.isArray(raw?.data)
         ? raw.data
         : Array.isArray(raw)
@@ -138,15 +147,19 @@ export function RequestFeedScreen({ navigation }: any) {
         <View style={styles.cardHeader}>
           <View style={styles.categoryRow}>
             <Text style={styles.category}>{item.category?.name || 'Device Repair'}</Text>
-            {item.brand && <Text style={styles.brand}> · {item.brand.name}</Text>}
+            {item.brand?.name && <Text style={styles.brand}> · {item.brand.name}</Text>}
+            {item.deviceModel && <Text style={styles.model}> {item.deviceModel}</Text>}
           </View>
-          <View style={[styles.priorityBadge, { borderColor: priorityColor }]}>
+          <View style={[styles.priorityBadge, { backgroundColor: priorityColor + '20' }]}>
             <Text style={[styles.priorityText, { color: priorityColor }]}>{priority}</Text>
           </View>
         </View>
 
-        {item.deviceModel && <Text style={styles.model}>{item.deviceModel}</Text>}
-        <Text style={styles.desc} numberOfLines={3}>{desc}</Text>
+        {desc ? (
+          <Text style={styles.desc} numberOfLines={2}>
+            {desc}
+          </Text>
+        ) : null}
 
         <View style={styles.cardFooter}>
           <Text style={styles.location}>📍 {location}</Text>
@@ -177,8 +190,25 @@ export function RequestFeedScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Repair Requests 📋</Text>
-        <Text style={styles.subtitle}>Browse open requests available for quotes ({filteredRequests.length} matching)</Text>
+        <View style={styles.headerTitleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Repair Requests 📋</Text>
+            <Text style={styles.subtitle}>Browse open requests available for quotes ({filteredRequests.length} matching)</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.notifBellBtn}
+            onPress={() => navigation.navigate('ProfileTab', { screen: 'Notifications' })}
+          >
+            <Text style={styles.notifBellIcon}>🔔</Text>
+            {unreadNotifsCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {unreadNotifsCount > 9 ? '9+' : unreadNotifsCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
@@ -236,6 +266,42 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
   subtitle: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, marginBottom: Spacing.xs },
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  notifBellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginLeft: Spacing.sm,
+  },
+  notifBellIcon: {
+    fontSize: 20,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#EF4444',
+    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: FontWeight.bold,
+  },
 
   searchBar: {
     flexDirection: 'row',

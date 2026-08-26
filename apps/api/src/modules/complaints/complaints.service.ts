@@ -7,11 +7,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ComplaintStatus, JobStatus, RequestStatus, UserRole } from '@fixme/shared-types';
+import { ComplaintStatus, JobStatus, RequestStatus, UserRole, NotificationType } from '@fixme/shared-types';
 import { ComplaintEntity } from './complaint.entity';
 import { JobEntity } from '../jobs/job.entity';
 import { JobStatusHistoryEntity } from '../jobs/job-status-history.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateComplaintDto, UpdateComplaintStatusDto } from './dto/complaint.dto';
 
 @Injectable()
@@ -30,6 +31,8 @@ export class ComplaintsService {
 
     @InjectRepository(RepairRequestEntity)
     private readonly requestRepo: Repository<RepairRequestEntity>,
+
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   public async create(
@@ -98,6 +101,19 @@ export class ComplaintsService {
         await this.requestRepo.update(job.requestId, { status: RequestStatus.DISPUTED });
       } catch {}
     }
+
+    // Notify respondent
+    try {
+      if (respondentId) {
+        await this.notificationsService.create({
+          userId: respondentId,
+          type: NotificationType.COMPLAINT_UPDATED,
+          title: '⚠️ Dispute / Complaint Logged',
+          body: `A dispute has been logged regarding job #${job.id.slice(0, 8)}: ${dto.reason.replace(/_/g, ' ')}`,
+          data: { complaintId: saved.id, jobId: job.id },
+        });
+      }
+    } catch (err: any) {}
 
     this.logger.log(`Dispute/Complaint created: ${saved.id} for job: ${job.id}`);
     return saved;
@@ -214,6 +230,29 @@ export class ComplaintsService {
         }
       } catch {}
     }
+
+    // Notify both complainant and respondent
+    try {
+      const msg = `Dispute status updated to ${dto.status}${dto.resolution ? ': ' + dto.resolution : ''}`;
+      if (complaint.complainantId) {
+        await this.notificationsService.create({
+          userId: complaint.complainantId,
+          type: NotificationType.COMPLAINT_UPDATED,
+          title: '⚖️ Dispute Resolution Update',
+          body: msg,
+          data: { complaintId: complaint.id, status: dto.status },
+        });
+      }
+      if (complaint.respondentId) {
+        await this.notificationsService.create({
+          userId: complaint.respondentId,
+          type: NotificationType.COMPLAINT_UPDATED,
+          title: '⚖️ Dispute Resolution Update',
+          body: msg,
+          data: { complaintId: complaint.id, status: dto.status },
+        });
+      }
+    } catch (err: any) {}
 
     this.logger.log(`Complaint ${complaintId} updated to ${dto.status} by admin ${adminUserId}`);
     return complaint;

@@ -53,4 +53,5 @@ export type ProfileStackParamList = {
   ManageAreas: undefined;
   ManageMembers: undefined;
   Registration: undefined;
+  Notifications: undefined;
 };

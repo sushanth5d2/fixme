@@ -146,6 +146,12 @@ export function FixerMainProfileScreen({ navigation }: any) {
       onPress: () => navigation.navigate('ManageAreas'),
     },
     {
+      icon: '🔔',
+      title: 'Notifications',
+      subtitle: 'View recent job, quote, and dispute alerts',
+      onPress: () => navigation.navigate('Notifications'),
+    },
+    {
       icon: '🔑',
       title: 'Change Password',
       subtitle: 'Update your workshop login password',
@@ -154,6 +160,12 @@ export function FixerMainProfileScreen({ navigation }: any) {
   ];
 
   const memberMenuItems = [
+    {
+      icon: '🔔',
+      title: 'Notifications',
+      subtitle: 'View your job assignments and updates',
+      onPress: () => navigation.navigate('Notifications'),
+    },
     {
       icon: '🔑',
       title: 'Change Password',

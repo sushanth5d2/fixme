@@ -12,6 +12,7 @@ import { CustomerEntity } from '../customers/customer.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
 import { QuoteEntity } from '../quotes/quote.entity';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AuthModule } from '../auth/auth.module';
       QuoteEntity,
     ]),
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [ChatController],
   providers: [ChatService],

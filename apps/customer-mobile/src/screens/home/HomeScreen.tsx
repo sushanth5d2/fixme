@@ -102,20 +102,26 @@ export function HomeScreen({ navigation }: Props) {
         // Deduplicate and filter active only
         const seen = new Set<string>();
         const uniqueCats: Category[] = [];
-        for (const cat of rawCats) {
-          if (cat.isActive === false) continue;
-          const key = cat.slug.toLowerCase().replace(/[^a-z]/g, '');
-          const nameKey = cat.name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 5);
-          if (!seen.has(key) && !seen.has(nameKey)) {
-            seen.add(key);
-            seen.add(nameKey);
-            uniqueCats.push(cat);
-          }
-        }
-        setCategories(uniqueCats);
+
+      if (notifRes?.data) {
+        setUnreadNotifsCount(notifRes.data?.data?.count ?? notifRes.data?.count ?? 0);
       }
-      if (reqRes?.data?.data) {
-        const rawReqs = reqRes.data.data;
+
+      if (catRes?.data) {
+        const raw = catRes.data?.data;
+        const list: Category[] = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw)
+          ? raw
+          : [];
+        if (list.length > 0) {
+          const activeOnly = list.filter((c) => c.isActive !== false);
+          setCategories(activeOnly);
+        }
+      }
+
+      if (reqRes?.data) {
+        const rawReqs = reqRes.data?.data;
         const reqList: RecentRequest[] = Array.isArray(rawReqs?.data)
           ? rawReqs.data
           : Array.isArray(rawReqs)
@@ -174,10 +180,27 @@ export function HomeScreen({ navigation }: Props) {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      {/* Header */}
+      {/* Header with Notification Bell */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hello! 👋</Text>
-        <Text style={styles.headerTitle}>What needs fixing?</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.greeting}>Hello! 👋</Text>
+            <Text style={styles.headerTitle}>What needs fixing?</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.notifBellBtn}
+            onPress={() => (navigation as any).navigate('ProfileTab', { screen: 'Notifications' })}
+          >
+            <Text style={styles.notifBellIcon}>🔔</Text>
+            {unreadNotifsCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {unreadNotifsCount > 9 ? '9+' : unreadNotifsCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* Search Bar for Device Types */}
         <View style={styles.searchBar}>
@@ -308,6 +331,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: BorderRadius.xl,
     borderBottomRightRadius: BorderRadius.xl,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   greeting: {
     fontSize: FontSize.base,
     color: Colors.muted,
@@ -317,6 +345,35 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xxl,
     fontWeight: FontWeight.bold,
     color: Colors.white,
+  },
+  notifBellBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  notifBellIcon: {
+    fontSize: 22,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
   },
   searchBar: {
     flexDirection: 'row',

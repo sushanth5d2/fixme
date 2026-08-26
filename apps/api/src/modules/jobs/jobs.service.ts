@@ -13,6 +13,7 @@ import {
   UserRole,
   RequestStatus,
   QuoteRevisionStatus,
+  NotificationType,
 } from '@fixme/shared-types';
 import { JobEntity } from './job.entity';
 import { JobStatusHistoryEntity } from './job-status-history.entity';
@@ -20,6 +21,7 @@ import { FixerEntity } from '../fixers/fixer.entity';
 import { FixerMemberEntity } from '../fixers/fixer-member.entity';
 import { QuoteEntity } from '../quotes/quote.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateJobStatusDto, CancelJobDto, ScheduleJobDto } from './dto/job.dto';
 
 const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
@@ -44,6 +46,8 @@ export class JobsService {
 
     @InjectRepository(JobStatusHistoryEntity)
     private readonly historyRepo: Repository<JobStatusHistoryEntity>,
+
+    private readonly notificationsService: NotificationsService,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -113,6 +117,44 @@ export class JobsService {
       this.logger.log(
         `Job ${jobId}: ${fromStatus} → ${dto.status} (synced request ${job.requestId})`,
       );
+
+      // Notify customer of status change
+      try {
+        if (job.customer?.userId) {
+          const statusLabels: Record<string, string> = {
+            FIXER_ON_THE_WAY: '🚗 Fixer is on the way to your location',
+            DEVICE_RECEIVED: '📦 Device received at workshop',
+            DIAGNOSING: '🔍 Diagnostic inspection in progress',
+            REPAIR_IN_PROGRESS: '🔧 Repair in progress',
+            READY_FOR_DELIVERY: '✅ Device is ready for delivery / pickup',
+            COMPLETED: '🎉 Repair completed!',
+            CANCELLED: '❌ Job has been cancelled',
+            DISPUTED: '⚠️ Job placed under dispute moderation',
+          };
+          await this.notificationsService.create({
+            userId: job.customer.userId,
+            type:
+              dto.status === JobStatus.COMPLETED
+                ? NotificationType.REPAIR_COMPLETED
+                : NotificationType.JOB_STATUS_CHANGED,
+            title:
+              dto.status === JobStatus.COMPLETED
+                ? '🎉 Repair Completed!'
+                : '🔧 Repair Status Update',
+            body:
+              statusLabels[dto.status] ||
+              `Status updated to ${dto.status.replace(/_/g, ' ')}`,
+            data: {
+              jobId: job.id,
+              status: dto.status,
+              requestId: job.requestId,
+            },
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to dispatch status notification: ${err?.message}`);
+      }
+
       return job;
     });
   }
@@ -124,7 +166,7 @@ export class JobsService {
   ): Promise<JobEntity> {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
-      relations: ['fixer', 'assignedMember'],
+      relations: ['fixer', 'customer', 'assignedMember'],
     });
     if (!job) throw new NotFoundException('Job not found');
 
@@ -149,6 +191,19 @@ export class JobsService {
       job.assignedMemberId = member.id;
       await this.jobRepo.save(job);
       this.logger.log(`Job ${jobId} assigned to member: ${member.fullName} (${member.id})`);
+
+      // Notify the assigned technician
+      try {
+        if (member.userId) {
+          await this.notificationsService.create({
+            userId: member.userId,
+            type: NotificationType.JOB_ASSIGNED,
+            title: '📋 New Job Assigned',
+            body: `You have been assigned to repair job #${job.id.slice(0, 8)}`,
+            data: { jobId: job.id, requestId: job.requestId },
+          });
+        }
+      } catch (err: any) {}
     } else {
       job.assignedMember = null;
       job.assignedMemberId = null;
@@ -166,7 +221,7 @@ export class JobsService {
   ): Promise<JobEntity> {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
-      relations: ['fixer'],
+      relations: ['fixer', 'customer'],
     });
     if (!job) throw new NotFoundException('Job not found');
 
@@ -189,6 +244,20 @@ export class JobsService {
 
     await this.jobRepo.save(job);
     this.logger.log(`Job ${jobId} revision requested: ₹${dto.revisedTotal}`);
+
+    // Notify customer
+    try {
+      if (job.customer?.userId) {
+        await this.notificationsService.create({
+          userId: job.customer.userId,
+          type: NotificationType.QUOTE_RECEIVED,
+          title: '📝 Quote Revision Requested',
+          body: `Fixer requested quote revision to ₹${Number(dto.revisedTotal).toLocaleString('en-IN')}: ${dto.notes}`,
+          data: { jobId: job.id, revisedTotal: dto.revisedTotal },
+        });
+      }
+    } catch (err: any) {}
+
     return this.getJobById(userId, jobId);
   }
 
@@ -199,7 +268,7 @@ export class JobsService {
   ): Promise<JobEntity> {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
-      relations: ['customer'],
+      relations: ['customer', 'fixer'],
     });
     if (!job) throw new NotFoundException('Job not found');
 
@@ -231,6 +300,24 @@ export class JobsService {
     this.logger.log(
       `Job ${jobId} revision responded by customer: ${dto.accept ? 'APPROVED' : 'DECLINED'} (agreedTotal: ₹${job.agreedTotal})`,
     );
+
+    // Notify fixer
+    try {
+      if (job.fixer?.userId) {
+        await this.notificationsService.create({
+          userId: job.fixer.userId,
+          type: dto.accept
+            ? NotificationType.QUOTE_ACCEPTED
+            : NotificationType.QUOTE_REJECTED,
+          title: dto.accept ? '✅ Quote Revision Approved' : '✕ Quote Revision Declined',
+          body: dto.accept
+            ? 'Customer approved your revised quote.'
+            : 'Customer declined your quote revision.',
+          data: { jobId: job.id, accepted: dto.accept },
+        });
+      }
+    } catch (err: any) {}
+
     return this.getJobById(customerUserId, jobId);
   }
 

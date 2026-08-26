@@ -7,11 +7,13 @@ import { JobEntity } from '../jobs/job.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
 import { CustomerEntity } from '../customers/customer.entity';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ReviewEntity, JobEntity, FixerEntity, CustomerEntity]),
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [ReviewsController],
   providers: [ReviewsService],

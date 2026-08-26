@@ -9,6 +9,7 @@ import { JobEntity } from '../jobs/job.entity';
 import { JobStatusHistoryEntity } from '../jobs/job-status-history.entity';
 import { ConversationEntity } from '../chat/conversation.entity';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AuthModule } from '../auth/auth.module';
       ConversationEntity,
     ]),
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [QuotesController],
   providers: [QuotesService],

@@ -9,6 +9,7 @@ import { AddressEntity } from '../customers/address.entity';
 import { DeviceCategoryEntity } from '../categories/device-category.entity';
 import { DeviceBrandEntity } from '../brands/device-brand.entity';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AuthModule } from '../auth/auth.module';
       DeviceBrandEntity,
     ]),
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [RepairRequestsController],
   providers: [RepairRequestsService],

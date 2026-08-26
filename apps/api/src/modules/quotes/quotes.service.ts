@@ -8,13 +8,15 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { QuoteStatus, RequestStatus, JobStatus, UserRole } from '@fixme/shared-types';
+import { QuoteStatus, RequestStatus, JobStatus, UserRole, NotificationType } from '@fixme/shared-types';
 import { QuoteEntity } from './quote.entity';
 import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
+import { CustomerEntity } from '../customers/customer.entity';
 import { JobEntity } from '../jobs/job.entity';
 import { JobStatusHistoryEntity } from '../jobs/job-status-history.entity';
 import { ConversationEntity } from '../chat/conversation.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitQuoteDto, AcceptQuoteDto } from './dto/quote.dto';
 
 @Injectable()
@@ -30,6 +32,8 @@ export class QuotesService {
 
     @InjectRepository(FixerEntity)
     private readonly fixerRepo: Repository<FixerEntity>,
+
+    private readonly notificationsService: NotificationsService,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -94,6 +98,31 @@ export class QuotesService {
     // Update request status to QUOTED if still OPEN
     if (request.status === RequestStatus.OPEN) {
       await this.requestRepo.update(request.id, { status: RequestStatus.QUOTED });
+    }
+
+    // Notify customer about received quote
+    try {
+      if (request.customerId) {
+        const cust = await this.dataSource
+          .getRepository(CustomerEntity)
+          .findOne({ where: { id: request.customerId } });
+        if (cust?.userId) {
+          await this.notificationsService.create({
+            userId: cust.userId,
+            type: NotificationType.QUOTE_RECEIVED,
+            title: '💰 New Quote Received',
+            body: `${fixer.companyName || 'A verified fixer'} sent a quote of ₹${totalAmount.toLocaleString('en-IN')}`,
+            data: {
+              requestId: request.id,
+              quoteId: saved.id,
+              fixerId: fixer.id,
+              amount: totalAmount,
+            },
+          });
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to dispatch quote notification: ${err?.message}`);
     }
 
     this.logger.log(`Quote ${saved.id} submitted by fixer ${fixer.id} for request ${dto.requestId}`);
@@ -191,6 +220,28 @@ export class QuotesService {
         .set({ jobId: savedJob.id })
         .where('request_id = :requestId', { requestId: quote.requestId })
         .execute();
+
+      // Notify fixer that quote was accepted
+      try {
+        if (quote.fixerId) {
+          const fixer = await manager.getRepository(FixerEntity).findOne({ where: { id: quote.fixerId } });
+          if (fixer?.userId) {
+            await this.notificationsService.create({
+              userId: fixer.userId,
+              type: NotificationType.QUOTE_ACCEPTED,
+              title: '🎉 Quote Accepted!',
+              body: `Customer accepted your quote of ₹${Number(quote.estimatedTotal || 0).toLocaleString('en-IN')}. A new repair job has been assigned!`,
+              data: {
+                jobId: savedJob.id,
+                requestId: quote.requestId,
+                quoteId: quote.id,
+              },
+            });
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to dispatch quote accepted notification: ${err?.message}`);
+      }
 
       this.logger.log(`Job ${savedJob.id} created for accepted quote ${quoteId}`);
       return quote;

@@ -11,6 +11,7 @@ import { UserEntity } from '../users/user.entity';
 import { DeviceCategoryEntity } from '../categories/device-category.entity';
 import { DeviceBrandEntity } from '../brands/device-brand.entity';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuthModule } from '../auth/auth.module';
       UserEntity,
     ]),
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [FixersController],
   providers: [FixersService],

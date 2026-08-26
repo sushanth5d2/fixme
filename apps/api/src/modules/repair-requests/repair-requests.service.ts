@@ -8,13 +8,14 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { RequestStatus, UserRole, UrgencyLevel, MediaType } from '@fixme/shared-types';
+import { RequestStatus, UserRole, UrgencyLevel, MediaType, NotificationType } from '@fixme/shared-types';
 import { RepairRequestEntity } from './repair-request.entity';
 import { RepairRequestMediaEntity } from './repair-request-media.entity';
 import { CustomerEntity } from '../customers/customer.entity';
 import { AddressEntity } from '../customers/address.entity';
 import { DeviceCategoryEntity } from '../categories/device-category.entity';
 import { DeviceBrandEntity } from '../brands/device-brand.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CreateRepairRequestDto,
   CancelRepairRequestDto,
@@ -54,6 +55,8 @@ export class RepairRequestsService implements OnModuleInit {
 
     @InjectRepository(DeviceBrandEntity)
     private readonly brandRepo: Repository<DeviceBrandEntity>,
+
+    private readonly notificationsService: NotificationsService,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -212,6 +215,29 @@ export class RepairRequestsService implements OnModuleInit {
             this.logger.warn(`Could not save request media: ${mediaErr}`);
           }
         }
+      }
+
+      // Notify matching verified fixers in this category
+      try {
+        const fixers = await this.dataSource.query(
+          `SELECT DISTINCT f.user_id FROM fixers f
+           JOIN fixer_services fs ON fs.fixer_id = f.id
+           WHERE fs.category_id = $1 AND f.verification_status = 'VERIFIED'`,
+          [category.id],
+        );
+        for (const fixerRow of fixers || []) {
+          if (fixerRow.user_id) {
+            await this.notificationsService.create({
+              userId: fixerRow.user_id,
+              type: NotificationType.NEW_MATCHING_REQUEST,
+              title: '🔧 New Repair Request',
+              body: `New ${category.name} repair request posted in ${saved.area || saved.city || 'your area'}`,
+              data: { requestId: saved.id, categoryId: category.id },
+            });
+          }
+        }
+      } catch (notifErr) {
+        this.logger.warn(`Could not dispatch fixer matching request notifications: ${notifErr}`);
       }
 
       this.logger.log(`Repair request created: ${saved.id} by customer: ${customer.id}`);

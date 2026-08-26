@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
-import { UserRole } from '@fixme/shared-types';
+import { UserRole, NotificationType } from '@fixme/shared-types';
 import { ConversationEntity } from './conversation.entity';
 import { ConversationMemberEntity } from './conversation-member.entity';
 import { MessageEntity } from './message.entity';
@@ -16,6 +16,7 @@ import { RepairRequestEntity } from '../repair-requests/repair-request.entity';
 import { CustomerEntity } from '../customers/customer.entity';
 import { FixerEntity } from '../fixers/fixer.entity';
 import { QuoteEntity } from '../quotes/quote.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SendMessageDto, CreateConversationDto } from './dto/chat.dto';
 
 @Injectable()
@@ -46,6 +47,8 @@ export class ChatService {
 
     @InjectRepository(QuoteEntity)
     private readonly quoteRepo: Repository<QuoteEntity>,
+
+    private readonly notificationsService: NotificationsService,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -279,6 +282,30 @@ export class ChatService {
     await this.conversationRepo.update(dto.conversationId, {
       lastMessageAt: new Date(),
     });
+
+    // Notify other conversation members
+    try {
+      const otherMembers = await this.memberRepo.find({
+        where: { conversationId: dto.conversationId },
+      });
+      const recipients = otherMembers.filter((m) => m.userId !== userId);
+      for (const recipient of recipients) {
+        await this.notificationsService.create({
+          userId: recipient.userId,
+          type: NotificationType.NEW_MESSAGE,
+          title: '💬 New Message',
+          body: dto.content.length > 80 ? dto.content.slice(0, 77) + '...' : dto.content,
+          data: {
+            conversationId: dto.conversationId,
+            messageId: saved.id,
+            jobId: conversation.jobId,
+            requestId: conversation.requestId,
+          },
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to dispatch message notification: ${err?.message}`);
+    }
 
     return saved;
   }

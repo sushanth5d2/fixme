@@ -11,6 +11,7 @@ import { ReviewEntity } from '../reviews/review.entity';
 import { DeviceCategoryEntity } from '../categories/device-category.entity';
 import { DeviceBrandEntity } from '../brands/device-brand.entity';
 import { UserEntity } from '../users/user.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { UserEntity } from '../users/user.entity';
       DeviceBrandEntity,
       UserEntity,
     ]),
+    NotificationsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

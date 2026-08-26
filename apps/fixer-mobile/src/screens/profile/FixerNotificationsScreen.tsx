@@ -21,7 +21,7 @@ interface Notification {
   createdAt: string;
 }
 
-export function NotificationsScreen({ navigation }: any) {
+export function FixerNotificationsScreen({ navigation }: any) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,7 +37,7 @@ export function NotificationsScreen({ navigation }: any) {
         : [];
       setNotifications(items);
     } catch (err) {
-      console.error('[Fetch Notifications Error]', err);
+      console.error('[Fetch Fixer Notifications Error]', err);
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -45,34 +45,15 @@ export function NotificationsScreen({ navigation }: any) {
     }
   };
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => {
+    fetch();
+  }, []);
 
   const markAsRead = async (id: string) => {
     try {
       await api.patch(`/notifications/${id}/read`);
-      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     } catch {}
-  };
-
-  const handlePressNotification = async (item: Notification) => {
-    if (!item.isRead) {
-      markAsRead(item.id);
-    }
-
-    if (item.data?.conversationId && navigation) {
-      navigation.navigate('ChatConversation', { conversationId: item.data.conversationId });
-      return;
-    }
-
-    if (item.data?.jobId && navigation) {
-      navigation.navigate('CustomerJobDetail', { jobId: item.data.jobId });
-      return;
-    }
-
-    if (item.data?.requestId && navigation) {
-      navigation.navigate('RequestDetail', { requestId: item.data.requestId });
-      return;
-    }
   };
 
   const markAllRead = async () => {
@@ -82,25 +63,72 @@ export function NotificationsScreen({ navigation }: any) {
     } catch {}
   };
 
+  const handlePressNotification = (item: Notification) => {
+    if (!item.isRead) {
+      markAsRead(item.id);
+    }
+
+    if (item.data?.jobId && navigation) {
+      navigation.navigate('MyJobsTab', {
+        screen: 'JobDetail',
+        params: { jobId: item.data.jobId },
+      });
+      return;
+    }
+
+    if (item.data?.requestId && navigation) {
+      navigation.navigate('FeedTab', {
+        screen: 'RequestDetail',
+        params: { requestId: item.data.requestId },
+      });
+      return;
+    }
+
+    if (item.data?.conversationId && navigation) {
+      navigation.navigate('ChatTab', {
+        screen: 'ChatRoom',
+        params: {
+          conversationId: item.data.conversationId,
+          otherUserName: 'Customer',
+        },
+      });
+      return;
+    }
+  };
+
   const getIcon = (type: string) => {
     switch (type) {
-      case 'QUOTE_RECEIVED': return '💰';
-      case 'QUOTE_ACCEPTED': return '🎉';
-      case 'QUOTE_REJECTED': return '❌';
-      case 'JOB_STATUS_CHANGED': return '🔧';
-      case 'JOB_ASSIGNED': return '📋';
-      case 'REPAIR_COMPLETED': return '🎉';
-      case 'NEW_MESSAGE': return '💬';
-      case 'REVIEW_RECEIVED': return '⭐';
-      case 'COMPLAINT_UPDATED': return '⚠️';
-      default: return '🔔';
+      case 'NEW_MATCHING_REQUEST':
+        return '🔧';
+      case 'QUOTE_ACCEPTED':
+        return '🎉';
+      case 'QUOTE_REJECTED':
+        return '❌';
+      case 'JOB_ASSIGNED':
+        return '📋';
+      case 'NEW_MESSAGE':
+        return '💬';
+      case 'REVIEW_RECEIVED':
+        return '⭐';
+      case 'COMPLAINT_UPDATED':
+        return '⚠️';
+      case 'VERIFICATION_APPROVED':
+        return '🛡️';
+      case 'VERIFICATION_REJECTED':
+        return '⚠️';
+      default:
+        return '🔔';
     }
   };
 
   const notifsList = Array.isArray(notifications) ? notifications : [];
 
   if (loading && notifsList.length === 0) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+      </View>
+    );
   }
 
   return (
@@ -115,7 +143,9 @@ export function NotificationsScreen({ navigation }: any) {
         data={notifsList}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} />
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.card, !item.isRead && styles.unread]}
@@ -128,7 +158,10 @@ export function NotificationsScreen({ navigation }: any) {
               <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
               <Text style={styles.time}>
                 {new Date(item.createdAt).toLocaleString('en-IN', {
-                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                  day: 'numeric',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit',
                 })}
               </Text>
             </View>
@@ -152,17 +185,22 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: Spacing.base },
   markAllBtn: { padding: Spacing.base, alignItems: 'flex-end' },
-  markAllText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.accent },
+  markAllText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.accent },
   card: {
-    flexDirection: 'row', alignItems: 'flex-start', backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg, padding: Spacing.base, marginBottom: Spacing.sm,
-    borderWidth: 1, borderColor: Colors.borderLight,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  unread: { backgroundColor: Colors.accentSoft, borderColor: Colors.accent + '30' },
+  unread: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   icon: { fontSize: 24, marginRight: Spacing.md, marginTop: 2 },
   info: { flex: 1 },
   title: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.text },
-  titleUnread: { fontWeight: FontWeight.bold },
+  titleUnread: { fontWeight: FontWeight.bold, color: Colors.primary },
   body: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 18, marginTop: 2 },
   time: { fontSize: FontSize.xs, color: Colors.muted, marginTop: Spacing.xs },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accent, marginTop: 6 },

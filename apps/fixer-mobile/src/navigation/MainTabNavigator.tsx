@@ -26,6 +26,7 @@ import { FixerManageServicesScreen } from '../screens/profile/FixerManageService
 import { FixerManageAreasScreen } from '../screens/profile/FixerManageAreasScreen';
 import { FixerManageMembersScreen } from '../screens/profile/FixerManageMembersScreen';
 import { FixerRegistrationScreen } from '../screens/profile/FixerRegistrationScreen';
+import { FixerNotificationsScreen } from '../screens/profile/FixerNotificationsScreen';
 import { useAuthStore } from '../stores/auth.store';
 import { Colors, FontSize, FontWeight } from '../theme/tokens';
 
@@ -122,6 +123,7 @@ function ProfileNavigator() {
       <ProfileStack.Screen name="ManageServices" component={FixerManageServicesScreen} options={{ title: 'Repair Specialties' }} />
       <ProfileStack.Screen name="ManageAreas" component={FixerManageAreasScreen} options={{ title: 'Service Coverage' }} />
       <ProfileStack.Screen name="Registration" component={FixerRegistrationScreen} options={{ title: 'Business Details & KYC' }} />
+      <ProfileStack.Screen name="Notifications" component={FixerNotificationsScreen} options={{ title: 'Notifications' }} />
     </ProfileStack.Navigator>
   );
 }

@@ -15,6 +15,7 @@ import {
   DocumentStatus,
   UserRole,
   UserStatus,
+  NotificationType,
 } from '@fixme/shared-types';
 import { FixerEntity } from './fixer.entity';
 import { FixerMemberEntity } from './fixer-member.entity';
@@ -24,6 +25,7 @@ import { FixerServiceAreaEntity } from './fixer-service-area.entity';
 import { DeviceCategoryEntity } from '../categories/device-category.entity';
 import { DeviceBrandEntity } from '../brands/device-brand.entity';
 import { UserEntity } from '../users/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   RegisterFixerDto,
   UpdateFixerProfileDto,
@@ -56,6 +58,9 @@ const ALLOWED_VERIFICATION_TRANSITIONS: Partial<
   [FixerVerificationStatus.VERIFIED]: [
     FixerVerificationStatus.BLOCKED,
   ],
+  [FixerVerificationStatus.BLOCKED]: [
+    FixerVerificationStatus.VERIFIED,
+  ],
 };
 
 @Injectable()
@@ -86,6 +91,8 @@ export class FixersService implements OnModuleInit {
 
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+
+    private readonly notificationsService: NotificationsService,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -382,6 +389,23 @@ export class FixersService implements OnModuleInit {
     fixer.verificationStatus = newStatus;
     fixer.rejectionReason = dto.rejectionReason ?? dto.adminNotes ?? null;
     await this.fixerRepo.save(fixer);
+
+    // Notify fixer about verification status
+    try {
+      if (fixer.userId) {
+        await this.notificationsService.create({
+          userId: fixer.userId,
+          type: isApprove
+            ? NotificationType.VERIFICATION_APPROVED
+            : NotificationType.VERIFICATION_REJECTED,
+          title: isApprove ? '🛡️ Business Profile Verified!' : '⚠️ Verification Update',
+          body: isApprove
+            ? 'Congratulations! Your business documents are verified. You can now receive and quote customer repair requests.'
+            : `Your verification status was updated to REJECTED${fixer.rejectionReason ? ': ' + fixer.rejectionReason : ''}`,
+          data: { fixerId: fixer.id, status: newStatus },
+        });
+      }
+    } catch (err: any) {}
 
     this.logger.log(
       `Fixer ${fixerId} ${newStatus} by admin ${adminUserId}`,
