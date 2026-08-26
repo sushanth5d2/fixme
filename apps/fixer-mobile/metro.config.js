@@ -43,9 +43,28 @@ config.resolver.extraNodeModules = {
   ),
 };
 
-// 6. API Proxy: proxy /api/* requests to localhost:3000 so the mobile app
+// 6. API Proxy: proxy /api/* requests to 127.0.0.1:3000 so the mobile app
 //    can reach the NestJS API through the Expo tunnel without needing to
 //    resolve *.app.github.dev DNS (which some ISP DNS servers block).
+const apiProxy = createProxyMiddleware({
+  target: 'http://127.0.0.1:3000',
+  changeOrigin: true,
+  logLevel: 'warn',
+  onError: (err, req, res) => {
+    console.warn('[Metro Proxy] Backend not reachable at 127.0.0.1:3000:', err.message);
+    if (!res.headersSent) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: {
+          code: 'BACKEND_UNAVAILABLE',
+          message: 'Backend API is currently starting up or offline. Please ensure NestJS API is running on port 3000.',
+        },
+      }));
+    }
+  },
+});
+
 config.server = config.server || {};
 const originalEnhanceMiddleware = config.server.enhanceMiddleware;
 config.server.enhanceMiddleware = (middleware, server) => {
@@ -53,16 +72,9 @@ config.server.enhanceMiddleware = (middleware, server) => {
     middleware = originalEnhanceMiddleware(middleware, server);
   }
 
-  // Return a handler that checks for /api/ prefix first
   return (req, res, next) => {
     if (req.url && req.url.startsWith('/api/')) {
-      // Proxy to the NestJS API running on localhost:3000
-      const proxy = createProxyMiddleware({
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        logLevel: 'warn',
-      });
-      return proxy(req, res, next);
+      return apiProxy(req, res, next);
     }
     return middleware(req, res, next);
   };
