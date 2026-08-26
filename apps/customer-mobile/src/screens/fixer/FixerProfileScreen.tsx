@@ -46,6 +46,7 @@ export function FixerProfileScreen({ route, navigation }: any) {
   const [fixer, setFixer] = useState<FixerProfile | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -76,8 +77,6 @@ export function FixerProfileScreen({ route, navigation }: any) {
   }
 
   const reviewList = Array.isArray(reviews) ? reviews : [];
-
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
