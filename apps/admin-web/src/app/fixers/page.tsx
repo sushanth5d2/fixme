@@ -46,8 +46,11 @@ export default function FixersPage() {
     try {
       const url = filter === 'ALL' ? '/fixers/admin?limit=50' : `/fixers/admin?status=${filter}&limit=50`;
       const { data } = await api.get(url);
-      setFixers(data.data || data || []);
-    } catch {
+      const raw = data?.data?.data ?? data?.data ?? data ?? [];
+      const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
+      setFixers(list);
+    } catch (err) {
+      console.warn('[Fixers fetch error]', err);
       setFixers([]);
     } finally {
       setLoading(false);

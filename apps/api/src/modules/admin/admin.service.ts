@@ -72,7 +72,6 @@ export class AdminService {
             FixerVerificationStatus.UNDER_REVIEW,
             FixerVerificationStatus.DOCUMENT_SUBMITTED,
             FixerVerificationStatus.REGISTERED,
-            'PENDING' as any,
           ]),
         },
       }),

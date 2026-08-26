@@ -22,7 +22,9 @@ export default function ReviewsPage() {
   const fetchReviews = async () => {
     try {
       const { data } = await api.get('/reviews/admin?limit=50');
-      setReviews(data.data || []);
+      const raw = data?.data?.data ?? data?.data ?? data ?? [];
+      const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
+      setReviews(list);
     } catch {} finally { setLoading(false); }
   };
 

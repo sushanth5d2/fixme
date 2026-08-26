@@ -38,7 +38,9 @@ export default function RequestsPage() {
     try {
       const url = filter === 'ALL' ? '/repair-requests/admin?limit=50' : `/repair-requests/admin?status=${filter}&limit=50`;
       const { data } = await api.get(url);
-      setRequests(data.data || data || []);
+      const raw = data?.data?.data ?? data?.data ?? data ?? [];
+      const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
+      setRequests(list);
     } catch {
       setRequests([]);
     } finally {

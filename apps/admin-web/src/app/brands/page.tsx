@@ -21,7 +21,9 @@ export default function BrandsPage() {
   const fetchBrands = async () => {
     try {
       const { data } = await api.get('/brands');
-      setBrands(data.data || data || []);
+      const raw = data?.data?.data ?? data?.data ?? data ?? [];
+      const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
+      setBrands(list);
     } catch {} finally { setLoading(false); }
   };
 

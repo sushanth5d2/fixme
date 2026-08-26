@@ -38,7 +38,9 @@ export default function ComplaintsPage() {
     setLoading(true);
     try {
       const { data } = await api.get(`/complaints/admin?status=${filter}&limit=50`);
-      setComplaints(data.data || []);
+      const raw = data?.data?.data ?? data?.data ?? data ?? [];
+      const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
+      setComplaints(list);
     } catch { setComplaints([]); }
     finally { setLoading(false); }
   };
