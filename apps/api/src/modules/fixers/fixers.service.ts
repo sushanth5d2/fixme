@@ -211,8 +211,8 @@ export class FixersService implements OnModuleInit {
 
   public async getPublicProfile(fixerId: string): Promise<FixerEntity> {
     const fixer = await this.fixerRepo.findOne({
-      where: { id: fixerId, verificationStatus: FixerVerificationStatus.VERIFIED },
-      relations: ['services', 'services.category', 'services.brand', 'serviceAreas'],
+      where: { id: fixerId },
+      relations: ['services', 'services.category', 'services.brand', 'serviceAreas', 'documents', 'user'],
     });
     if (!fixer) throw new NotFoundException('Fixer not found');
     return fixer;
