@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DataTable, StatusBadge } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -27,25 +27,33 @@ const STATUS_VARIANT: Record<string, 'info' | 'warning' | 'success' | 'error'> =
 };
 
 export default function ComplaintsPage() {
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [filter, setFilter] = useState('OPEN');
+  const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
+  const [filter, setFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
   const [resolution, setResolution] = useState('');
 
   const fetchComplaints = async () => {
-    setLoading(true);
     try {
-      const { data } = await api.get(`/complaints/admin?status=${filter}&limit=50`);
+      const { data } = await api.get('/complaints/admin?limit=100');
       const raw = data?.data?.data ?? data?.data ?? data ?? [];
       const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
-      setComplaints(list);
-    } catch { setComplaints([]); }
+      setAllComplaints(list);
+    } catch { setAllComplaints([]); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchComplaints(); }, [filter]);
+  useEffect(() => {
+    fetchComplaints();
+    const interval = setInterval(fetchComplaints, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const filteredComplaints = useMemo(() => {
+    if (filter === 'ALL') return allComplaints;
+    return allComplaints.filter((c) => c.status === filter);
+  }, [allComplaints, filter]);
 
   const handleUpdate = async (complaintId: string, status: string) => {
     try {
@@ -65,34 +73,48 @@ export default function ComplaintsPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Complaints</h1>
-        <p className="text-gray-500 mt-1">Manage customer and fixer complaints</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Complaints & Disputes</h1>
+          <p className="text-gray-500 mt-1">Manage and resolve customer/fixer disputes</p>
+        </div>
+        <button
+          onClick={() => { setLoading(true); fetchComplaints(); }}
+          className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50 shadow-sm"
+        >
+          🔄 Refresh
+        </button>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs - Instant 0ms response */}
       <div className="flex gap-2 mb-6 flex-wrap">
-        {['OPEN', 'UNDER_REVIEW', 'WAITING_FOR_INFORMATION', 'RESOLVED', 'REJECTED', 'CLOSED'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === s ? 'bg-accent text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {s.replace(/_/g, ' ')}
-          </button>
-        ))}
+        {['ALL', 'OPEN', 'UNDER_REVIEW', 'WAITING_FOR_INFORMATION', 'RESOLVED', 'REJECTED'].map((s) => {
+          const count = s === 'ALL' ? allComplaints.length : allComplaints.filter((c) => c.status === s).length;
+          return (
+            <button
+              key={s}
+              onClick={() => setFilter(s)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 ${
+                filter === s ? 'bg-accent text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <span>{s.replace(/_/g, ' ')}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${filter === s ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
+      {loading && allComplaints.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">Loading complaints...</div>
       ) : (
         <DataTable headers={['Reason', 'Complainant', 'Respondent', 'Status', 'Date', 'Actions']}>
-          {complaints.length === 0 ? (
-            <tr><td colSpan={6} className="text-center py-12 text-gray-400">No complaints found</td></tr>
+          {filteredComplaints.length === 0 ? (
+            <tr><td colSpan={6} className="text-center py-12 text-gray-400">No complaints found in this tab</td></tr>
           ) : (
-            complaints.map((c) => (
+            filteredComplaints.map((c) => (
               <tr key={c.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <p className="text-sm font-medium text-gray-900">{c.reason.replace(/_/g, ' ')}</p>

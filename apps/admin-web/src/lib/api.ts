@@ -25,43 +25,11 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-let adminAuthPromise: Promise<string | null> | null = null;
-
-async function getOrFetchAdminToken(baseUrl: string): Promise<string | null> {
-  if (typeof window === 'undefined') return null;
-  const existing = localStorage.getItem('fixme_admin_token');
-  if (existing) return existing;
-
-  if (!adminAuthPromise) {
-    adminAuthPromise = (async () => {
-      try {
-        const { data } = await axios.post(`${baseUrl}/auth/login`, {
-          email: 'admin@fixme.dev',
-          password: 'DevPassword1!',
-        });
-        const token = data?.data?.tokens?.accessToken || data?.data?.data?.tokens?.accessToken || data?.tokens?.accessToken;
-        if (token) {
-          localStorage.setItem('fixme_admin_token', token);
-          return token;
-        }
-      } catch (e) {
-        console.warn('[Admin API] Could not auto-login dev admin:', e);
-      }
-      return null;
-    })();
-  }
-  return adminAuthPromise;
-}
-
-api.interceptors.request.use(async (config) => {
-  const baseUrl = getApiBaseUrl();
-  config.baseURL = baseUrl;
+api.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl();
 
   if (typeof window !== 'undefined') {
-    let token = localStorage.getItem('fixme_admin_token');
-    if (!token) {
-      token = await getOrFetchAdminToken(baseUrl);
-    }
+    const token = localStorage.getItem('fixme_admin_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DataTable, StatusBadge } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -35,29 +35,41 @@ const STATUS_VARIANT: Record<string, 'info' | 'warning' | 'success' | 'error'> =
 };
 
 export default function FixersPage() {
-  const [fixers, setFixers] = useState<Fixer[]>([]);
+  const [allFixers, setAllFixers] = useState<Fixer[]>([]);
   const [filter, setFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [selectedFixer, setSelectedFixer] = useState<Fixer | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchFixers = async () => {
-    setLoading(true);
     try {
-      const url = filter === 'ALL' ? '/fixers/admin?limit=50' : `/fixers/admin?status=${filter}&limit=50`;
-      const { data } = await api.get(url);
+      const { data } = await api.get('/fixers/admin?limit=100');
       const raw = data?.data?.data ?? data?.data ?? data ?? [];
       const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
-      setFixers(list);
+      setAllFixers(list);
     } catch (err) {
       console.warn('[Fixers fetch error]', err);
-      setFixers([]);
+      setAllFixers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchFixers(); }, [filter]);
+  useEffect(() => {
+    fetchFixers();
+    const interval = setInterval(fetchFixers, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const filteredFixers = useMemo(() => {
+    if (filter === 'ALL') return allFixers;
+    return allFixers.filter((f) => {
+      if (filter === 'UNDER_REVIEW') {
+        return f.verificationStatus === 'UNDER_REVIEW' || f.verificationStatus === 'DOCUMENT_SUBMITTED' || f.verificationStatus === 'REGISTERED';
+      }
+      return f.verificationStatus === filter;
+    });
+  }, [allFixers, filter]);
 
   const handleAction = async (fixerId: string, action: 'approve' | 'reject') => {
     setActionLoading(true);
@@ -83,38 +95,48 @@ export default function FixersPage() {
           <p className="text-gray-500 mt-1">Review and approve workshop applications</p>
         </div>
         <button
-          onClick={() => fetchFixers()}
+          onClick={() => { setLoading(true); fetchFixers(); }}
           className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50 shadow-sm"
         >
           🔄 Refresh
         </button>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs - Instant 0ms response */}
       <div className="flex gap-2 mb-6 flex-wrap">
-        {['ALL', 'UNDER_REVIEW', 'VERIFIED', 'REGISTERED', 'REJECTED'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === s ? 'bg-accent text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {s.replace(/_/g, ' ')}
-          </button>
-        ))}
+        {['ALL', 'UNDER_REVIEW', 'VERIFIED', 'REGISTERED', 'REJECTED'].map((s) => {
+          const count = s === 'ALL'
+            ? allFixers.length
+            : s === 'UNDER_REVIEW'
+            ? allFixers.filter((f) => f.verificationStatus === 'UNDER_REVIEW' || f.verificationStatus === 'DOCUMENT_SUBMITTED' || f.verificationStatus === 'REGISTERED').length
+            : allFixers.filter((f) => f.verificationStatus === s).length;
+          return (
+            <button
+              key={s}
+              onClick={() => setFilter(s)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 ${
+                filter === s ? 'bg-accent text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <span>{s.replace(/_/g, ' ')}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${filter === s ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {loading ? (
+      {loading && allFixers.length === 0 ? (
         <div className="text-center py-12 text-gray-400">Loading fixers...</div>
       ) : (
         <DataTable headers={['Company / Workshop', 'Proprietor', 'GSTIN / PAN', 'Location', 'Status', 'Registered', 'Actions']}>
-          {fixers.length === 0 ? (
+          {filteredFixers.length === 0 ? (
             <tr>
-              <td colSpan={7} className="text-center py-12 text-gray-400">No fixers found in this category</td>
+              <td colSpan={7} className="text-center py-12 text-gray-400">No fixers found in this tab</td>
             </tr>
           ) : (
-            fixers.map((f) => (
+            filteredFixers.map((f) => (
               <tr key={f.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4">
                   <p className="text-sm font-medium text-gray-900">{f.companyName}</p>
