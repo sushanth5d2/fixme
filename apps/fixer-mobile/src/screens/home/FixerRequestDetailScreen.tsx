@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Button } from '../../components/ui';
+import { InteractiveMapView } from '../../components/ui/InteractiveMapView';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
 import { api } from '../../services/api';
 
@@ -257,19 +258,29 @@ export function FixerRequestDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          {/* Visual Map Area */}
-          <View style={styles.mapVisual}>
-            <View style={styles.mapRoadH} />
-            <View style={styles.mapRoadV} />
-            <View style={styles.mapPinBadge}>
-              <Text style={styles.mapPinIcon}>📍</Text>
-              <Text style={styles.mapPinText} numberOfLines={1}>
-                {request.area || request.city || 'Customer Area'}
-              </Text>
-            </View>
-          </View>
-
           <Text style={styles.addressText}>{fullAddress}</Text>
+
+          {request.latitude && request.longitude ? (
+            <View style={styles.inlineMapContainer}>
+              <InteractiveMapView
+                markers={[
+                  {
+                    id: request.id,
+                    latitude: request.latitude,
+                    longitude: request.longitude,
+                    title: request.area || request.city || 'Customer Location',
+                    icon: '📍',
+                    badge: 'Customer Location',
+                  },
+                ]}
+                centerLat={request.latitude}
+                centerLng={request.longitude}
+                initialZoom={15}
+                style={styles.inlineMap}
+                showNavigationButton={true}
+              />
+            </View>
+          ) : null}
 
           {request.latitude && request.longitude ? (
             <Text style={styles.gpsText}>
@@ -413,38 +424,19 @@ const styles = StyleSheet.create({
   mapCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   navBtn: { backgroundColor: Colors.accent, paddingHorizontal: Spacing.md, paddingVertical: 5, borderRadius: BorderRadius.sm },
   navBtnText: { color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold },
-  mapVisual: {
-    height: 110,
-    backgroundColor: '#E8ECEF',
+  inlineMapContainer: {
+    height: 190,
     borderRadius: BorderRadius.md,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: Spacing.xs,
     overflow: 'hidden',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
     borderWidth: 1,
     borderColor: Colors.borderLight,
   },
-  mapRoadH: { position: 'absolute', left: 0, right: 0, height: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D0D7DE' },
-  mapRoadV: { position: 'absolute', top: 0, bottom: 0, width: 16, backgroundColor: '#FFFFFF', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D0D7DE' },
-  mapPinBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1.5,
-    borderColor: Colors.accent,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-    gap: 4,
+  inlineMap: {
+    width: '100%',
+    height: '100%',
   },
-  mapPinIcon: { fontSize: 16 },
-  mapPinText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.text },
   addressText: { fontSize: FontSize.sm, color: Colors.text, marginTop: Spacing.xs, lineHeight: 20 },
   gpsText: { fontSize: 11, color: Colors.muted, marginTop: 2, fontWeight: FontWeight.medium },
   bottomBar: {
