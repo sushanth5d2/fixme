@@ -28,17 +28,37 @@ import { CreateReviewDto } from './dto/review.dto';
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
-  @Post('job/:jobId')
+  @Post(['job/:jobId', 'request/:jobId'])
   @Roles(UserRole.CUSTOMER)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: '[Customer] Submit a review for a completed job' })
+  @ApiOperation({ summary: '[Customer] Submit or edit a review for a completed job or request' })
   @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
   public create(
     @CurrentUser('sub') userId: string,
     @Param('jobId', ParseUUIDPipe) jobId: string,
     @Body() dto: CreateReviewDto,
   ) {
-    return this.reviewsService.create(userId, jobId, dto);
+    return this.reviewsService.createOrUpdate(userId, jobId, dto);
+  }
+
+  @Patch(['job/:jobId', 'request/:jobId'])
+  @Roles(UserRole.CUSTOMER)
+  @ApiOperation({ summary: '[Customer] Update a review for a completed job or request' })
+  @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
+  public update(
+    @CurrentUser('sub') userId: string,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.reviewsService.createOrUpdate(userId, jobId, dto);
+  }
+
+  @Get(['job/:jobId', 'request/:jobId'])
+  @Roles(UserRole.CUSTOMER, UserRole.FIXER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get existing review for a job or request' })
+  @ApiParam({ name: 'jobId', type: 'string', format: 'uuid' })
+  public getByJobOrRequestId(@Param('jobId', ParseUUIDPipe) jobId: string) {
+    return this.reviewsService.getByJobOrRequestId(jobId);
   }
 
   @Get('fixer/:fixerId')

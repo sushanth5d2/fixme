@@ -371,7 +371,7 @@ export function FixerProfileScreen({ route, navigation }: any) {
             reviewList.map((review, idx) => {
               const ratingScore = Math.min(Math.max(Math.round(Number(review.overallRating ?? review.rating ?? 5)), 1), 5);
               const commentText = review.reviewText || review.comment || '';
-              const authorName = review.customer?.firstName || 'Customer';
+              const authorName = (review as any).customerName || review.customer?.firstName || 'Verified Customer';
 
               return (
                 <View key={review.id || idx} style={styles.reviewCard}>

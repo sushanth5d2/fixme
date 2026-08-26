@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert,
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { Button } from '../../components/ui';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../theme/tokens';
@@ -12,14 +19,24 @@ interface JobDetail {
   scheduledDate: string | null;
   completedAt: string | null;
   request: {
+    id?: string;
     description: string;
     deviceModel: string | null;
     category: { name: string };
     brand: { name: string } | null;
   };
-  fixer: { companyName: string; ownerName: string; averageRating: number };
+  fixer: { id?: string; companyName: string; ownerName: string; averageRating: number };
   quote: { amount: number; warrantyDays: number };
   statusHistory: Array<{ toStatus: string; createdAt: string }>;
+  createdAt: string;
+}
+
+interface ExistingReview {
+  id: string;
+  overallRating: number;
+  rating?: number;
+  reviewText?: string | null;
+  comment?: string | null;
   createdAt: string;
 }
 
@@ -39,11 +56,63 @@ export function CustomerJobDetailScreen({ route, navigation }: any) {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Review & Rating State
+  const [existingReview, setExistingReview] = useState<ExistingReview | null>(null);
+  const [ratingInput, setRatingInput] = useState(5);
+  const [commentInput, setCommentInput] = useState('');
+  const [isEditingReview, setIsEditingReview] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  const fetchJobData = async () => {
+    try {
+      const [jobRes, revRes] = await Promise.all([
+        api.get(`/jobs/${jobId}`),
+        api.get(`/reviews/job/${jobId}`).catch(() => null),
+      ]);
+      const jData = jobRes?.data?.data || jobRes?.data;
+      setJob(jData);
+
+      const rData = revRes?.data?.data || revRes?.data;
+      if (rData && rData.id) {
+        setExistingReview(rData);
+        setRatingInput(rData.overallRating || rData.rating || 5);
+        setCommentInput(rData.reviewText || rData.comment || '');
+      }
+    } catch {}
+    finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    api.get(`/jobs/${jobId}`).then(({ data }) => {
-      setJob(data.data || data);
-    }).catch(() => {}).finally(() => setLoading(false));
+    fetchJobData();
   }, [jobId]);
+
+  const handleSubmitReview = async () => {
+    if (ratingInput < 1) {
+      Alert.alert('Rating Required', 'Please select a star rating between 1 and 5.');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const { data } = await api.post(`/reviews/job/${jobId}`, {
+        rating: ratingInput,
+        comment: commentInput.trim() || undefined,
+      });
+      const savedReview = data?.data || data;
+      setExistingReview(savedReview);
+      setIsEditingReview(false);
+      Alert.alert(
+        isEditingReview ? 'Review Updated! 🎉' : 'Thank You! ⭐',
+        'Your rating and feedback have been submitted and are now visible on the fixer\'s public profile.',
+      );
+      fetchJobData();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const handleCancel = () => {
     Alert.alert('Cancel Job', 'Are you sure you want to cancel this job?', [
@@ -64,7 +133,7 @@ export function CustomerJobDetailScreen({ route, navigation }: any) {
 
   const statusInfo = STATUS_LABELS[job.status] || { label: job.status, icon: '•' };
   const canCancel = ['ASSIGNED', 'FIXER_ON_THE_WAY'].includes(job.status);
-  const canReview = job.status === 'COMPLETED';
+  const isCompleted = job.status === 'COMPLETED';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -79,26 +148,129 @@ export function CustomerJobDetailScreen({ route, navigation }: any) {
         <Text style={styles.sectionTitle}>Your Fixer</Text>
         <View style={styles.fixerRow}>
           <View style={styles.fixerAvatar}>
-            <Text style={styles.fixerAvatarText}>{job.fixer.companyName.charAt(0)}</Text>
+            <Text style={styles.fixerAvatarText}>{job.fixer?.companyName?.charAt(0) || 'F'}</Text>
           </View>
           <View>
-            <Text style={styles.fixerName}>{job.fixer.companyName}</Text>
-            <Text style={styles.fixerSub}>{job.fixer.ownerName} · ★ {Number(job.fixer.averageRating).toFixed(1)}</Text>
+            <Text style={styles.fixerName}>{job.fixer?.companyName}</Text>
+            <Text style={styles.fixerSub}>{job.fixer?.ownerName} · ★ {Number(job.fixer?.averageRating || 5.0).toFixed(1)}</Text>
           </View>
         </View>
       </View>
 
+      {/* Rating & Feedback Section (Visible on Completed Jobs) */}
+      {isCompleted && (
+        <View style={styles.reviewSectionCard}>
+          <View style={styles.reviewCardHeader}>
+            <Text style={styles.reviewCardTitle}>
+              {existingReview && !isEditingReview ? '⭐ Your Rating & Feedback' : '⭐ Rate & Review Fixer'}
+            </Text>
+            {existingReview && !isEditingReview && (
+              <TouchableOpacity
+                style={styles.editReviewBtn}
+                onPress={() => {
+                  setRatingInput(existingReview.overallRating || existingReview.rating || 5);
+                  setCommentInput(existingReview.reviewText || existingReview.comment || '');
+                  setIsEditingReview(true);
+                }}
+              >
+                <Text style={styles.editReviewBtnText}>✏️ Edit Review</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {existingReview && !isEditingReview ? (
+            <View style={styles.existingReviewBox}>
+              <View style={styles.starsRowDisplay}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Text key={star} style={styles.starIconDisplay}>
+                    {star <= (existingReview.overallRating || existingReview.rating || 5) ? '★' : '☆'}
+                  </Text>
+                ))}
+                <Text style={styles.ratingNumber}>
+                  {Number(existingReview.overallRating || existingReview.rating || 5).toFixed(1)} / 5.0
+                </Text>
+              </View>
+              {existingReview.reviewText || existingReview.comment ? (
+                <Text style={styles.existingCommentText}>
+                  "{existingReview.reviewText || existingReview.comment}"
+                </Text>
+              ) : null}
+              <Text style={styles.reviewTimestamp}>
+                Submitted on {new Date(existingReview.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.reviewFormBox}>
+              <Text style={styles.rateSubtitle}>
+                How was your repair experience with {job.fixer?.companyName || 'the fixer'}?
+              </Text>
+
+              {/* Star Selector */}
+              <View style={styles.starSelectorRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    activeOpacity={0.7}
+                    onPress={() => setRatingInput(star)}
+                    style={styles.starTouch}
+                  >
+                    <Text style={[styles.starIconSelect, star <= ratingInput && styles.starIconSelectActive]}>
+                      ★
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.feedbackInput}
+                placeholder="Write your feedback... e.g. Prompt service, excellent repair quality, reasonable cost."
+                placeholderTextColor={Colors.muted}
+                value={commentInput}
+                onChangeText={setCommentInput}
+                multiline
+                numberOfLines={3}
+              />
+
+              <View style={styles.reviewActionsRow}>
+                {isEditingReview && (
+                  <TouchableOpacity
+                    style={styles.cancelEditBtn}
+                    onPress={() => setIsEditingReview(false)}
+                    disabled={submittingReview}
+                  >
+                    <Text style={styles.cancelEditText}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.submitReviewBtn}
+                  onPress={handleSubmitReview}
+                  disabled={submittingReview}
+                >
+                  {submittingReview ? (
+                    <ActivityIndicator size="small" color={Colors.white} />
+                  ) : (
+                    <Text style={styles.submitReviewText}>
+                      {isEditingReview ? 'Update Rating & Feedback' : 'Submit Rating & Feedback'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
       {/* Device */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Device</Text>
-        <Text style={styles.infoText}>{job.request.category.name}{job.request.brand ? ` · ${job.request.brand.name}` : ''}</Text>
-        {job.request.deviceModel && <Text style={styles.subText}>{job.request.deviceModel}</Text>}
+        <Text style={styles.infoText}>{job.request?.category?.name}{job.request?.brand ? ` · ${job.request.brand.name}` : ''}</Text>
+        {job.request?.deviceModel && <Text style={styles.subText}>{job.request.deviceModel}</Text>}
       </View>
 
       {/* Problem */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Problem</Text>
-        <Text style={styles.desc}>{job.request.description}</Text>
+        <Text style={styles.desc}>{job.request?.description}</Text>
       </View>
 
       {/* Payment */}
@@ -106,11 +278,11 @@ export function CustomerJobDetailScreen({ route, navigation }: any) {
         <Text style={styles.sectionTitle}>Payment</Text>
         <View style={styles.payRow}>
           <Text style={styles.payLabel}>Quote Amount</Text>
-          <Text style={styles.payAmount}>₹{Number(job.quote.amount).toLocaleString('en-IN')}</Text>
+          <Text style={styles.payAmount}>₹{Number(job.quote?.amount || 0).toLocaleString('en-IN')}</Text>
         </View>
         <View style={styles.payRow}>
           <Text style={styles.payLabel}>Warranty</Text>
-          <Text style={styles.payValue}>{job.quote.warrantyDays} days</Text>
+          <Text style={styles.payValue}>{job.quote?.warrantyDays || 0} days</Text>
         </View>
       </View>
 
@@ -137,9 +309,6 @@ export function CustomerJobDetailScreen({ route, navigation }: any) {
 
       {/* Actions */}
       <View style={styles.actions}>
-        {canReview && (
-          <Button title="⭐ Write a Review" onPress={() => Alert.alert('Coming Soon', 'Review screen coming soon!')} size="lg" />
-        )}
         {canCancel && (
           <Button title="Cancel Job" onPress={handleCancel} variant="danger" size="md" />
         )}
@@ -182,4 +351,141 @@ const styles = StyleSheet.create({
   timelineLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.text },
   timelineDate: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
   actions: { gap: Spacing.md, marginTop: Spacing.md },
+
+  // Rating & Review Styles
+  reviewSectionCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: Spacing.md,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  reviewCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  reviewCardTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+  editReviewBtn: {
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  editReviewBtnText: {
+    color: Colors.accent,
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+  },
+  existingReviewBox: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    gap: Spacing.xs,
+  },
+  starsRowDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  starIconDisplay: {
+    fontSize: 20,
+    color: '#F59E0B',
+  },
+  ratingNumber: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: '#B45309',
+    marginLeft: Spacing.xs,
+  },
+  existingCommentText: {
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    fontStyle: 'italic',
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  reviewTimestamp: {
+    fontSize: FontSize.xs,
+    color: Colors.muted,
+    marginTop: Spacing.xs,
+  },
+
+  reviewFormBox: {
+    gap: Spacing.sm,
+  },
+  rateSubtitle: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  starSelectorRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  starTouch: {
+    padding: Spacing.xs,
+  },
+  starIconSelect: {
+    fontSize: 34,
+    color: '#D1D5DB',
+  },
+  starIconSelectActive: {
+    color: '#F59E0B',
+  },
+  feedbackInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    padding: Spacing.md,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlignVertical: 'top',
+    minHeight: 70,
+  },
+  reviewActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  cancelEditBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    justifyContent: 'center',
+  },
+  cancelEditText: {
+    color: Colors.muted,
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+  },
+  submitReviewBtn: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitReviewText: {
+    color: Colors.white,
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+  },
 });
