@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -35,6 +36,8 @@ interface FixerData {
   fullName?: string;
   phone?: string;
   email?: string;
+  profilePhotoKey?: string | null;
+  workshopPhotos?: string[];
   fixer?: any;
 }
 
@@ -50,6 +53,9 @@ export function FixerMainProfileScreen({ navigation }: any) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  // Photo Preview Modal
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -118,13 +124,13 @@ export function FixerMainProfileScreen({ navigation }: any) {
     {
       icon: '🏢',
       title: 'Business Profile & KYC',
-      subtitle: 'Company name, owner, GSTIN, PAN & workshop address',
+      subtitle: 'Edit workshop name, address, GSTIN & PAN',
       onPress: () => navigation.navigate('EditProfile'),
     },
     {
       icon: '👥',
-      title: 'Team & Technicians',
-      subtitle: 'Add shop staff, set passwords & assign repairs',
+      title: 'Manage Staff & Technicians',
+      subtitle: 'Add, view or remove team members',
       onPress: () => navigation.navigate('ManageMembers'),
     },
     {
@@ -160,6 +166,8 @@ export function FixerMainProfileScreen({ navigation }: any) {
     ? `Workshop: ${profile?.fixer?.companyName || 'Fix Me Service'}`
     : `Proprietor: ${profile?.ownerName || 'Verified Fixer'}`;
 
+  const photoUri = profile?.profilePhotoKey || (user as any)?.profilePhotoKey;
+
   return (
     <ScrollView
       style={styles.container}
@@ -168,11 +176,28 @@ export function FixerMainProfileScreen({ navigation }: any) {
     >
       {/* Profile Header */}
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {displayName.charAt(0).toUpperCase() || '🔧'}
-          </Text>
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            if (photoUri) setSelectedPhoto(photoUri);
+          }}
+          style={styles.avatarWrapper}
+        >
+          {photoUri ? (
+            <View style={styles.avatarContainer}>
+              <Image source={{ uri: photoUri }} style={styles.avatarImage} resizeMode="cover" />
+              <View style={styles.zoomBadge}>
+                <Text style={styles.zoomText}>🔍 View</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {displayName.charAt(0).toUpperCase() || '🔧'}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <Text style={styles.companyName}>{displayName}</Text>
         <Text style={styles.ownerName}>{subName}</Text>
@@ -305,6 +330,30 @@ export function FixerMainProfileScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Fullscreen Photo Lightbox Modal */}
+      <Modal
+        visible={!!selectedPhoto}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <View style={styles.photoModalBackdrop}>
+          <TouchableOpacity
+            style={styles.closePhotoBtn}
+            onPress={() => setSelectedPhoto(null)}
+          >
+            <Text style={styles.closePhotoText}>✕ Close</Text>
+          </TouchableOpacity>
+          {selectedPhoto ? (
+            <Image
+              source={{ uri: selectedPhoto }}
+              style={styles.fullscreenPhoto}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -322,6 +371,32 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: BorderRadius.xl,
     borderBottomRightRadius: BorderRadius.xl,
   },
+  avatarWrapper: {
+    marginBottom: Spacing.sm,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 3,
+    borderColor: Colors.accent,
+  },
+  zoomBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: Colors.white,
+  },
+  zoomText: { color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold },
   avatar: {
     width: 80,
     height: 80,
@@ -329,7 +404,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
     borderWidth: 3,
     borderColor: Colors.accent,
   },
@@ -431,4 +505,23 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   popupSaveText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+
+  photoModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenPhoto: { width: '92%', height: '82%' },
+  closePhotoBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    zIndex: 10,
+  },
+  closePhotoText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 });

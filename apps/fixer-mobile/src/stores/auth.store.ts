@@ -136,9 +136,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data } = await api.get('/fixers/me');
       const profile = data?.data?.profile || data?.data;
       if (profile) {
-        set({ fixerProfile: profile });
+        set((state) => ({
+          fixerProfile: profile,
+          user: state.user ? {
+            ...state.user,
+            profilePhotoKey: profile.profilePhotoKey || (state.user as any)?.profilePhotoKey,
+            fullName: profile.fullName || profile.ownerName || profile.companyName || (state.user as any)?.fullName,
+          } : state.user,
+        }));
       }
-    } catch {}
+    } catch (err: any) {
+      try {
+        const { data } = await api.get('/fixers/me/member-profile');
+        const memberProf = data?.data || data;
+        if (memberProf) {
+          set((state) => ({
+            fixerProfile: memberProf,
+            user: state.user ? {
+              ...state.user,
+              profilePhotoKey: memberProf.profilePhotoKey,
+              fullName: memberProf.fullName,
+              phone: memberProf.phone,
+            } : state.user,
+          }));
+        }
+      } catch {}
+    }
   },
 
   forgotPassword: async (email) => {
@@ -161,24 +184,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         const { data } = await api.get('/fixers/me');
         profile = data?.data?.profile || data?.data;
-        userData = profile?.user
-          ? { ...profile.user, fixerId: profile.id, userId: profile.userId || profile.user.id, role: 'FIXER' }
-          : { id: profile?.userId || profile?.id, userId: profile?.userId || profile?.id, role: 'FIXER', ...profile };
-      } catch (err: any) {
-        if (err?.response?.status === 403) {
-          const { data } = await api.get('/fixers/me/member-profile');
-          profile = data?.data || data;
+        if (profile?.fullName && !profile?.companyName) {
+          // This is a member profile
           userData = {
             id: profile?.userId || profile?.id,
             userId: profile?.userId || profile?.id,
             fullName: profile?.fullName,
             email: profile?.email,
+            phone: profile?.phone,
+            profilePhotoKey: profile?.profilePhotoKey,
             role: 'FIXER_MEMBER',
             fixerId: profile?.fixerId,
           };
         } else {
-          throw err;
+          userData = profile?.user
+            ? { ...profile.user, fixerId: profile.id, userId: profile.userId || profile.user.id, profilePhotoKey: profile.profilePhotoKey, role: 'FIXER' }
+            : { id: profile?.userId || profile?.id, userId: profile?.userId || profile?.id, role: 'FIXER', profilePhotoKey: profile?.profilePhotoKey, ...profile };
         }
+      } catch (err: any) {
+        const { data } = await api.get('/fixers/me/member-profile');
+        profile = data?.data || data;
+        userData = {
+          id: profile?.userId || profile?.id,
+          userId: profile?.userId || profile?.id,
+          fullName: profile?.fullName,
+          email: profile?.email,
+          phone: profile?.phone,
+          profilePhotoKey: profile?.profilePhotoKey,
+          role: 'FIXER_MEMBER',
+          fixerId: profile?.fixerId,
+        };
       }
 
       set({

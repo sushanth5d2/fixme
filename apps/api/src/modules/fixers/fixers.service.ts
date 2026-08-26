@@ -200,13 +200,20 @@ export class FixersService implements OnModuleInit {
 
   // ── Profile ────────────────────────────────────────────────
 
-  public async getMyProfile(userId: string): Promise<FixerEntity> {
+  public async getMyProfile(userId: string): Promise<any> {
     const fixer = await this.fixerRepo.findOne({
       where: { userId },
       relations: ['services', 'services.category', 'services.brand', 'serviceAreas'],
     });
-    if (!fixer) throw new NotFoundException('Fixer profile not found');
-    return fixer;
+    if (fixer) return fixer;
+
+    const member = await this.memberRepo.findOne({
+      where: { userId },
+      relations: ['fixer'],
+    });
+    if (member) return member;
+
+    throw new NotFoundException('Fixer profile not found');
   }
 
   public async getPublicProfile(fixerId: string): Promise<FixerEntity> {
