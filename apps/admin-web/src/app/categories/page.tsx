@@ -26,7 +26,7 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const { data } = await api.get('/categories');
+      const { data } = await api.get('/categories?all=true');
       const raw = data?.data?.data ?? data?.data ?? data ?? [];
       const list = Array.isArray(raw) ? raw : Array.isArray(data?.data) ? data.data : [];
       setCategories(list);

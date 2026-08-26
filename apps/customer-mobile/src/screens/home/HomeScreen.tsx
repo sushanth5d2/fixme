@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -35,18 +36,15 @@ const CATEGORY_ICONS: Record<string, string> = {
   printer: '🖨️',
   camera: '📷',
   tablet: '📲',
-  other: '🛠️',
+  other: '🔧',
 };
 
 interface RecentRequest {
   id: string;
-  problemTitle?: string;
-  problemDescription?: string;
-  description?: string;
+  description: string;
   status: string;
-  deviceModel?: string | null;
   category?: { name: string };
-  brand?: { name: string } | null;
+  brand?: { name: string };
   createdAt: string;
 }
 
@@ -54,6 +52,8 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+  iconKey?: string | null;
+  isActive?: boolean;
 }
 
 interface MyRequest {
@@ -97,10 +97,11 @@ export function HomeScreen({ navigation }: Props) {
       ]);
       const rawCats = catRes?.data?.data || (Array.isArray(catRes?.data) ? catRes.data : []);
       if (rawCats.length > 0) {
-        // Deduplicate
+        // Deduplicate and filter active only
         const seen = new Set<string>();
         const uniqueCats: Category[] = [];
         for (const cat of rawCats) {
+          if (cat.isActive === false) continue;
           const key = cat.slug.toLowerCase().replace(/[^a-z]/g, '');
           const nameKey = cat.name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 5);
           if (!seen.has(key) && !seen.has(nameKey)) {
@@ -187,9 +188,13 @@ export function HomeScreen({ navigation }: Props) {
                 })
               }
             >
-              <Text style={styles.categoryIcon}>
-                {CATEGORY_ICONS[cat.slug] || '🔧'}
-              </Text>
+              {cat.iconKey && (cat.iconKey.startsWith('http') || cat.iconKey.startsWith('data:')) ? (
+                <Image source={{ uri: cat.iconKey }} style={styles.categoryLogoImage} />
+              ) : (
+                <Text style={styles.categoryIcon}>
+                  {CATEGORY_ICONS[cat.slug] || '🔧'}
+                </Text>
+              )}
               <Text style={styles.categoryName} numberOfLines={1}>
                 {cat.name}
               </Text>
@@ -310,6 +315,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   categoryIcon: { fontSize: 32, marginBottom: Spacing.sm },
+  categoryLogoImage: { width: 32, height: 32, resizeMode: 'contain', marginBottom: Spacing.sm },
   categoryName: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,

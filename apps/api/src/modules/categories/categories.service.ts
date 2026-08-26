@@ -68,8 +68,10 @@ export class CategoriesService implements OnModuleInit {
     }
   }
 
-  public async findAll(): Promise<DeviceCategoryEntity[]> {
+  public async findAll(includeInactive = false): Promise<DeviceCategoryEntity[]> {
+    const whereClause = includeInactive ? {} : { isActive: true };
     const list = await this.categoryRepo.find({
+      where: whereClause,
       order: { sortOrder: 'ASC', name: 'ASC' },
     });
 

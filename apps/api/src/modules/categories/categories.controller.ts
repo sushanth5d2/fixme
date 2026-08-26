@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, ParseUUIDPipe, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, ParseUUIDPipe, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CategoriesService, CreateCategoryDto } from './categories.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,9 +14,11 @@ export class CategoriesController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'List all active device categories' })
-  public findAll() {
-    return this.categoriesService.findAll();
+  @ApiOperation({ summary: 'List device categories (active only by default, all with all=true)' })
+  @ApiQuery({ name: 'all', required: false, type: 'boolean' })
+  public findAll(@Query('all') all?: string) {
+    const includeInactive = all === 'true' || all === '1';
+    return this.categoriesService.findAll(includeInactive);
   }
 
   @Get(':id')
