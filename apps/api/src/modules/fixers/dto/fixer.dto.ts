@@ -37,6 +37,18 @@ export class RegisterFixerDto {
   @Matches(GSTIN_REGEX, { message: 'gstin must be a valid 15-character GSTIN' })
   gstin?: string;
 
+  @ApiPropertyOptional({ example: 'ABCDE1234F', description: '10-character PAN Number' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  panNumber?: string;
+
+  @ApiPropertyOptional({ example: 'UDYAM-KR-03-0012345', description: 'Business Registration / Trade License / MSME No' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  businessRegNo?: string;
+
   @ApiPropertyOptional({ example: 'Expert mobile and laptop repair with 10+ years experience' })
   @IsOptional()
   @IsString()

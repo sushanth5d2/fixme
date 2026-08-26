@@ -138,6 +138,8 @@ export class FixersService implements OnModuleInit {
         DO $$ BEGIN
           ALTER TABLE fixers ALTER COLUMN profile_photo_key TYPE text;
           ALTER TABLE fixers ADD COLUMN IF NOT EXISTS workshop_photos text[] DEFAULT '{}';
+          ALTER TABLE fixers ADD COLUMN IF NOT EXISTS pan_number VARCHAR(10);
+          ALTER TABLE fixers ADD COLUMN IF NOT EXISTS business_reg_no VARCHAR(100);
           ALTER TABLE jobs ADD COLUMN IF NOT EXISTS assigned_member_id UUID REFERENCES fixer_members(id) ON DELETE SET NULL;
           ALTER TABLE jobs ADD COLUMN IF NOT EXISTS revised_total DECIMAL(10,2);
           ALTER TABLE jobs ADD COLUMN IF NOT EXISTS revision_notes TEXT;
@@ -174,6 +176,8 @@ export class FixersService implements OnModuleInit {
       ownerName: dto.ownerName,
       companyName: dto.companyName,
       gstin: dto.gstin ? dto.gstin.toUpperCase() : null,
+      panNumber: dto.panNumber ? dto.panNumber.toUpperCase() : null,
+      businessRegNo: dto.businessRegNo ?? null,
       description: dto.description ?? null,
       experienceYears: dto.experienceYears,
       emergencyService: dto.emergencyService,
@@ -232,6 +236,8 @@ export class FixersService implements OnModuleInit {
       ...(dto.ownerName !== undefined && { ownerName: dto.ownerName }),
       ...(dto.companyName !== undefined && { companyName: dto.companyName }),
       ...(dto.gstin !== undefined && { gstin: dto.gstin?.toUpperCase() ?? null }),
+      ...(dto.panNumber !== undefined && { panNumber: dto.panNumber?.toUpperCase() ?? null }),
+      ...(dto.businessRegNo !== undefined && { businessRegNo: dto.businessRegNo ?? null }),
       ...(dto.description !== undefined && { description: dto.description }),
       ...(dto.experienceYears !== undefined && { experienceYears: dto.experienceYears }),
       ...(dto.emergencyService !== undefined && { emergencyService: dto.emergencyService }),

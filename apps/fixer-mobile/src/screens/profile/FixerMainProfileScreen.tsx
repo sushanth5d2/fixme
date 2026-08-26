@@ -117,8 +117,8 @@ export function FixerMainProfileScreen({ navigation }: any) {
   const ownerMenuItems = [
     {
       icon: '🏢',
-      title: 'Edit Business Profile',
-      subtitle: 'Company name, owner name, experience & address',
+      title: 'Business Profile & KYC',
+      subtitle: 'Company name, owner, GSTIN, PAN & workshop address',
       onPress: () => navigation.navigate('EditProfile'),
     },
     {
@@ -138,12 +138,6 @@ export function FixerMainProfileScreen({ navigation }: any) {
       title: 'Service Areas & Pincodes',
       subtitle: 'Operating locations and coverage distance',
       onPress: () => navigation.navigate('ManageAreas'),
-    },
-    {
-      icon: '📋',
-      title: 'Business Registration & KYC',
-      subtitle: 'GSTIN, PAN number and verification documents',
-      onPress: () => navigation.navigate('Registration'),
     },
   ];
 

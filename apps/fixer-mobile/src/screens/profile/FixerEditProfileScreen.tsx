@@ -24,6 +24,9 @@ export function FixerEditProfileScreen({ navigation }: any) {
     ownerName: '',
     experienceYears: '1',
     description: '',
+    gstin: '',
+    panNumber: '',
+    businessRegNo: '',
     addressLine: '',
     city: '',
     state: '',
@@ -34,6 +37,7 @@ export function FixerEditProfileScreen({ navigation }: any) {
     workingHoursStart: '09:00',
     workingHoursEnd: '19:00',
   });
+  const [verificationStatus, setVerificationStatus] = useState<string>('REGISTERED');
   const [logoPhoto, setLogoPhoto] = useState<string>('');
   const [shopPhotos, setShopPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,6 +54,9 @@ export function FixerEditProfileScreen({ navigation }: any) {
           ownerName: p.ownerName || '',
           experienceYears: String(p.experienceYears || '1'),
           description: p.description || '',
+          gstin: p.gstin || '',
+          panNumber: p.panNumber || '',
+          businessRegNo: p.businessRegNo || '',
           addressLine: p.addressLine || '',
           city: p.city || 'Bengaluru',
           state: p.state || 'Karnataka',
@@ -60,6 +67,9 @@ export function FixerEditProfileScreen({ navigation }: any) {
           workingHoursStart: p.workingHoursStart || '09:00',
           workingHoursEnd: p.workingHoursEnd || '19:00',
         });
+        if (p.verificationStatus) {
+          setVerificationStatus(p.verificationStatus);
+        }
         if (p.profilePhotoKey) {
           setLogoPhoto(p.profilePhotoKey);
         }
@@ -201,11 +211,16 @@ export function FixerEditProfileScreen({ navigation }: any) {
         ownerName: form.ownerName.trim(),
         experienceYears: parseInt(form.experienceYears, 10) || 1,
         emergencyService: !!form.emergencyService,
+        workingHoursStart: form.workingHoursStart || '09:00',
+        workingHoursEnd: form.workingHoursEnd || '19:00',
         profilePhotoKey: logoPhoto || undefined,
         workshopPhotos: shopPhotos,
       };
 
       if (form.description?.trim()) payload.description = form.description.trim();
+      if (form.gstin?.trim()) payload.gstin = form.gstin.trim().toUpperCase();
+      if (form.panNumber?.trim()) payload.panNumber = form.panNumber.trim().toUpperCase();
+      if (form.businessRegNo?.trim()) payload.businessRegNo = form.businessRegNo.trim();
       if (form.addressLine?.trim()) payload.addressLine = form.addressLine.trim();
       if (form.city?.trim()) payload.city = form.city.trim();
       if (form.state?.trim()) payload.state = form.state.trim();
@@ -215,7 +230,7 @@ export function FixerEditProfileScreen({ navigation }: any) {
 
       await api.patch('/fixers/me', payload);
 
-      Alert.alert('Success 🎉', 'Business profile, workshop photos, and address updated successfully!', [
+      Alert.alert('Success 🎉', 'Business profile, registration, and KYC updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (err: any) {
@@ -235,12 +250,37 @@ export function FixerEditProfileScreen({ navigation }: any) {
     );
   }
 
+  const isVerified = verificationStatus === 'VERIFIED';
+  const isPending = verificationStatus === 'UNDER_REVIEW' || verificationStatus === 'DOCUMENT_SUBMITTED';
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        {/* Business Logo / Profile Photo (Optional) */}
+        
+        {/* Verification Status Banner */}
+        <View style={[styles.statusCard, isVerified ? styles.statusCardVerified : isPending ? styles.statusCardPending : styles.statusCardRegistered]}>
+          <View style={styles.statusHeaderRow}>
+            <Text style={styles.statusBadgeIcon}>{isVerified ? '✅' : isPending ? '⏳' : '📝'}</Text>
+            <View style={styles.statusTextContainer}>
+              <Text style={styles.statusTitle}>
+                {isVerified ? 'Verified Pro Workshop' : isPending ? 'KYC Under Review' : 'Profile Registered'}
+              </Text>
+              <Text style={styles.statusSubtitle}>
+                {isVerified
+                  ? 'Your business and KYC are verified. You have full priority access to customer requests.'
+                  : isPending
+                  ? 'Your registration details are currently being reviewed by our verification team.'
+                  : 'Keep your business details and registration IDs updated to maintain fast customer trust.'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Section 1: Business Identity & Branding */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Shop Logo / Profile Photo (Optional)</Text>
+          <Text style={styles.cardTitle}>🏢 Business Identity & Branding</Text>
+
+          {/* Logo Upload */}
           <View style={styles.logoRow}>
             {logoPhoto ? (
               <View style={styles.logoPreviewContainer}>
@@ -262,27 +302,22 @@ export function FixerEditProfileScreen({ navigation }: any) {
               <TouchableOpacity style={styles.pickLogoBtn} onPress={handlePickLogo}>
                 <Text style={styles.pickLogoBtnText}>📷 Select Logo / Photo</Text>
               </TouchableOpacity>
-              <Text style={styles.fieldHint}>Helps customers identify your shop</Text>
+              <Text style={styles.fieldHint}>Helps customers recognize your workshop logo</Text>
             </View>
           </View>
-        </View>
-
-        {/* Business Information */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Business Information</Text>
 
           <Input
             label="Company / Workshop Name *"
             value={form.companyName}
             onChangeText={(v) => update('companyName', v)}
-            placeholder="e.g. Metro Electronics Repair"
+            placeholder="e.g. Apex Electronics & Mobile Care"
           />
 
           <Input
             label="Owner / Proprietor Name *"
             value={form.ownerName}
             onChangeText={(v) => update('ownerName', v)}
-            placeholder="e.g. Rajesh Sharma"
+            placeholder="e.g. Ravi Kumar"
           />
 
           <Input
@@ -294,20 +329,115 @@ export function FixerEditProfileScreen({ navigation }: any) {
           />
 
           <Input
-            label="About Your Repair Services"
+            label="About Your Business / Bio"
             value={form.description}
             onChangeText={(v) => update('description', v)}
-            placeholder="Expert in chip-level board repair, screen replacement..."
+            placeholder="Expert in motherboard IC level repair, display replacement, laptop service..."
             multiline
             numberOfLines={3}
             style={{ height: 80, textAlignVertical: 'top' }}
           />
         </View>
 
-        {/* Workshop / Shop Photos (Optional) */}
+        {/* Section 2: Business Registration & Tax KYC Identifiers */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>🆔 Business Registration & Tax KYC</Text>
+          <Text style={styles.cardSubtitle}>
+            Unique government registration and tax identification numbers for workshop credibility.
+          </Text>
+
+          <Input
+            label="GSTIN (optional)"
+            value={form.gstin}
+            onChangeText={(v) => update('gstin', v.toUpperCase())}
+            placeholder="22AAAAA0000A1Z5"
+            autoCapitalize="characters"
+            maxLength={15}
+            hint="15-character GST Identification Number"
+          />
+
+          <Input
+            label="PAN Number (optional)"
+            value={form.panNumber}
+            onChangeText={(v) => update('panNumber', v.toUpperCase())}
+            placeholder="ABCDE1234F"
+            autoCapitalize="characters"
+            maxLength={10}
+            hint="10-character Business / Proprietor PAN"
+          />
+
+          <Input
+            label="Trade License / MSME / Udyam No. (optional)"
+            value={form.businessRegNo}
+            onChangeText={(v) => update('businessRegNo', v)}
+            placeholder="e.g. UDYAM-KR-03-0012345"
+            hint="Shop Act / Trade License / MSME registration"
+          />
+        </View>
+
+        {/* Section 3: Workshop Address & Pinpoint GPS */}
         <View style={styles.card}>
           <View style={styles.addressHeaderRow}>
-            <Text style={styles.cardTitle}>Workshop / Shop Photos (Optional)</Text>
+            <Text style={styles.cardTitle}>📍 Workshop Address & Location</Text>
+            <TouchableOpacity
+              style={styles.detectLocationBtn}
+              onPress={handleDetectLocation}
+              disabled={locating}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <Text style={styles.detectLocationText}>📍 Auto-Detect GPS</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <Input
+            label="Shop / Building & Street Name *"
+            value={form.addressLine}
+            onChangeText={(v) => update('addressLine', v)}
+            placeholder="Shop 4, Ground Floor, Main Road"
+          />
+
+          <View style={styles.row}>
+            <Input
+              label="City / District *"
+              value={form.city}
+              onChangeText={(v) => update('city', v)}
+              containerStyle={styles.half}
+              placeholder="Bengaluru"
+            />
+            <Input
+              label="State *"
+              value={form.state}
+              onChangeText={(v) => update('state', v)}
+              containerStyle={styles.half}
+              placeholder="Karnataka"
+            />
+          </View>
+
+          <Input
+            label="Pincode (6 digits) *"
+            value={form.pincode}
+            onChangeText={(v) => update('pincode', v.replace(/\D/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+            placeholder="560001"
+          />
+
+          {form.latitude && form.longitude ? (
+            <View style={styles.gpsBadge}>
+              <Text style={styles.gpsText}>
+                🎯 Exact Workshop Pin: {Number(form.latitude).toFixed(4)}° N, {Number(form.longitude).toFixed(4)}° E
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Section 4: Workshop & Storefront Photos (up to 6) */}
+        <View style={styles.card}>
+          <View style={styles.addressHeaderRow}>
+            <Text style={styles.cardTitle}>📸 Workshop & Storefront Photos</Text>
             <Text style={styles.photoCount}>{shopPhotos.length}/6</Text>
           </View>
           <Text style={styles.photoSectionSubtitle}>
@@ -342,72 +472,33 @@ export function FixerEditProfileScreen({ navigation }: any) {
           </ScrollView>
         </View>
 
-        {/* Workshop Address & Location */}
+        {/* Section 5: Operations & Service Preferences */}
         <View style={styles.card}>
-          <View style={styles.addressHeaderRow}>
-            <Text style={styles.cardTitle}>Workshop Address</Text>
-            <TouchableOpacity
-              style={styles.detectLocationBtn}
-              onPress={handleDetectLocation}
-              disabled={locating}
-            >
-              {locating ? (
-                <ActivityIndicator size="small" color={Colors.accent} />
-              ) : (
-                <Text style={styles.detectLocationText}>📍 Auto-Detect GPS</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <Input
-            label="Shop / Building & Street Name"
-            value={form.addressLine}
-            onChangeText={(v) => update('addressLine', v)}
-            placeholder="Shop 4, 1st Cross, Main Road"
-          />
+          <Text style={styles.cardTitle}>⏰ Operating Hours & Availability</Text>
 
           <View style={styles.row}>
             <Input
-              label="City / District"
-              value={form.city}
-              onChangeText={(v) => update('city', v)}
+              label="Opening Time"
+              value={form.workingHoursStart}
+              onChangeText={(v) => update('workingHoursStart', v)}
               containerStyle={styles.half}
-              placeholder="Bengaluru"
+              placeholder="09:00"
+              hint="24-hr format (e.g. 09:00)"
             />
             <Input
-              label="State"
-              value={form.state}
-              onChangeText={(v) => update('state', v)}
+              label="Closing Time"
+              value={form.workingHoursEnd}
+              onChangeText={(v) => update('workingHoursEnd', v)}
               containerStyle={styles.half}
-              placeholder="Karnataka"
+              placeholder="19:00"
+              hint="24-hr format (e.g. 19:00)"
             />
           </View>
 
-          <Input
-            label="Pincode (6 digits)"
-            value={form.pincode}
-            onChangeText={(v) => update('pincode', v.replace(/\D/g, '').slice(0, 6))}
-            keyboardType="number-pad"
-            maxLength={6}
-            placeholder="560001"
-          />
-
-          {form.latitude && form.longitude ? (
-            <View style={styles.gpsBadge}>
-              <Text style={styles.gpsText}>
-                📍 Workshop GPS Pinned: {Number(form.latitude).toFixed(4)}, {Number(form.longitude).toFixed(4)}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Service Options */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Service Preferences</Text>
           <View style={styles.switchRow}>
             <View style={styles.switchLabelContainer}>
-              <Text style={styles.switchLabel}>Emergency / Instant Service ⚡</Text>
-              <Text style={styles.switchSublabel}>Available for urgent doorstep repair visits</Text>
+              <Text style={styles.switchLabel}>24/7 Emergency Repairs ⚡</Text>
+              <Text style={styles.switchSublabel}>Accept urgent on-demand repair requests</Text>
             </View>
             <Switch
               value={form.emergencyService}
@@ -419,7 +510,7 @@ export function FixerEditProfileScreen({ navigation }: any) {
         </View>
 
         <Button
-          title="Save Business Profile"
+          title="Save Business Profile & KYC"
           onPress={handleSave}
           loading={loading}
           size="lg"
@@ -434,6 +525,21 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { padding: Spacing.base, paddingBottom: Spacing.xxxl, gap: Spacing.md },
+
+  statusCard: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    borderWidth: 1,
+  },
+  statusCardVerified: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+  statusCardPending: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  statusCardRegistered: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  statusHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  statusBadgeIcon: { fontSize: 24 },
+  statusTextContainer: { flex: 1 },
+  statusTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.text },
+  statusSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2, lineHeight: 16 },
+
   card: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
@@ -448,9 +554,10 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.text },
+  cardSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginBottom: Spacing.xs, lineHeight: 16 },
   fieldHint: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
 
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.xs },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.xs, marginBottom: Spacing.xs },
   logoPreviewContainer: { position: 'relative' },
   logoPreview: {
     width: 64,
@@ -478,38 +585,61 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderStyle: 'dashed',
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoPlaceholderIcon: { fontSize: 26 },
-  logoActionBtns: { flex: 1 },
+  logoPlaceholderIcon: { fontSize: 28 },
+  logoActionBtns: { flex: 1, gap: 2 },
   pickLogoBtn: {
-    backgroundColor: Colors.accentSoft,
-    paddingVertical: 8,
+    backgroundColor: '#EEF2FF',
     paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.md,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
   },
   pickLogoBtnText: { color: Colors.accent, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
+  addressHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  detectLocationBtn: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  detectLocationText: { fontSize: FontSize.xs, color: '#16A34A', fontWeight: FontWeight.semibold },
+
+  row: { flexDirection: 'row', gap: Spacing.sm },
+  half: { flex: 1 },
+
+  gpsBadge: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: Spacing.xs,
+  },
+  gpsText: { fontSize: FontSize.xs, color: Colors.muted, fontWeight: FontWeight.medium },
+
   photoCount: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.accent },
-  photoSectionSubtitle: { fontSize: FontSize.xs, color: Colors.muted, lineHeight: 18 },
+  photoSectionSubtitle: { fontSize: FontSize.xs, color: Colors.muted, marginBottom: Spacing.xs, lineHeight: 16 },
   photosScroll: { flexDirection: 'row', marginTop: Spacing.xs },
   shopThumbContainer: { position: 'relative', marginRight: Spacing.sm },
-  shopThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.md,
-    backgroundColor: '#E5E7EB',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
+  shopThumb: { width: 80, height: 80, borderRadius: BorderRadius.md },
   removeShopThumbBtn: {
     position: 'absolute',
-    top: -6,
-    right: -6,
+    top: -4,
+    right: -4,
     backgroundColor: '#DC2626',
     width: 20,
     height: 20,
@@ -520,65 +650,40 @@ const styles = StyleSheet.create({
   removeShopThumbText: { color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold },
   addPhotoActions: { flexDirection: 'row', gap: Spacing.xs },
   addShopPhotoBtn: {
-    width: 72,
+    width: 80,
     height: 80,
     borderRadius: BorderRadius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.accent,
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderStyle: 'dashed',
-    backgroundColor: Colors.accentSoft,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   addShopPhotoCameraBtn: {
-    width: 72,
+    width: 80,
     height: 80,
     borderRadius: BorderRadius.md,
-    borderWidth: 1.5,
-    borderColor: '#D1D5DB',
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderStyle: 'dashed',
-    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   addShopPhotoIcon: { fontSize: 20, marginBottom: 2 },
-  addShopPhotoText: { fontSize: 10, fontWeight: FontWeight.bold, color: Colors.text },
-
-  addressHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  detectLocationBtn: {
-    backgroundColor: Colors.accentSoft,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.sm,
-  },
-  detectLocationText: { fontSize: FontSize.xs, color: Colors.accent, fontWeight: FontWeight.semibold },
-
-  row: { flexDirection: 'row', gap: Spacing.sm },
-  half: { flex: 1 },
-
-  gpsBadge: {
-    backgroundColor: '#EFF6FF',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    marginTop: Spacing.xs,
-  },
-  gpsText: { fontSize: FontSize.xs, color: '#1D4ED8', fontWeight: FontWeight.medium },
+  addShopPhotoText: { fontSize: 10, color: Colors.muted, fontWeight: FontWeight.medium },
 
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: Spacing.xs,
+    marginTop: Spacing.xs,
   },
-  switchLabelContainer: { flex: 1, marginRight: Spacing.md },
-  switchLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.text },
+  switchLabelContainer: { flex: 1, marginRight: Spacing.sm },
+  switchLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
   switchSublabel: { fontSize: FontSize.xs, color: Colors.muted, marginTop: 2 },
 
-  saveBtn: { marginTop: Spacing.sm },
+  saveBtn: { marginTop: Spacing.sm, marginBottom: Spacing.xl },
 });

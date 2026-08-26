@@ -39,6 +39,12 @@ export class FixerEntity {
   @Column({ type: 'varchar', length: 15, nullable: true, unique: true })
   gstin!: string | null;
 
+  @Column({ name: 'pan_number', type: 'varchar', length: 10, nullable: true })
+  panNumber!: string | null;
+
+  @Column({ name: 'business_reg_no', type: 'varchar', length: 100, nullable: true })
+  businessRegNo!: string | null;
+
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
