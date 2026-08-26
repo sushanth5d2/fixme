@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  OnModuleInit,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -35,7 +36,7 @@ import {
 } from './dto/auth.dto';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
@@ -52,6 +53,38 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
   ) {}
+
+  public async onModuleInit(): Promise<void> {
+    try {
+      const adminEmail = 'admin@fixme.dev';
+      const passwordHash = await bcrypt.hash('DevPassword1!', 10);
+      const existing = await this.userRepo.findOne({ where: { email: adminEmail } });
+
+      if (!existing) {
+        const adminUser = this.userRepo.create({
+          id: '00000000-0000-0000-0000-000000000001',
+          email: adminEmail,
+          mobile: '9000000001',
+          passwordHash,
+          role: UserRole.ADMIN,
+          status: UserStatus.ACTIVE,
+          isEmailVerified: true,
+          isMobileVerified: true,
+        });
+        await this.userRepo.save(adminUser);
+        this.logger.log('Seeded dev admin account: admin@fixme.dev / DevPassword1!');
+      } else {
+        existing.passwordHash = passwordHash;
+        existing.role = UserRole.ADMIN;
+        existing.status = UserStatus.ACTIVE;
+        existing.isEmailVerified = true;
+        existing.isMobileVerified = true;
+        await this.userRepo.save(existing);
+      }
+    } catch (err) {
+      this.logger.warn('Could not ensure default admin account:', err);
+    }
+  }
 
   // ── Signup ─────────────────────────────────────────────────
 
