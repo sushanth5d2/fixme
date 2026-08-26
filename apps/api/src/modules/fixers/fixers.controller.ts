@@ -229,7 +229,7 @@ export class FixersController {
 
   // ── Admin Operations ───────────────────────────────────────
 
-  @Get('admin/list')
+  @Get(['admin', 'admin/list'])
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: '[Admin] List fixers with optional status filter' })
   @ApiQuery({ name: 'status', required: false, enum: FixerVerificationStatus })

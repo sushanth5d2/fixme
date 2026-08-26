@@ -11,10 +11,21 @@ interface User {
 
 interface FixerProfile {
   id: string;
+  userId?: string;
   ownerName: string;
   companyName: string;
+  gstin?: string | null;
+  panNumber?: string | null;
+  businessRegNo?: string | null;
   experienceYears: number;
   emergencyService: boolean;
+  verificationStatus: string;
+  addressLine?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  profilePhotoKey?: string | null;
+  workshopPhotos?: string[];
 }
 
 interface AuthState {
@@ -32,9 +43,21 @@ interface AuthState {
     lastName?: string;
     ownerName?: string;
     companyName?: string;
+    gstin?: string;
+    panNumber?: string;
+    businessRegNo?: string;
+    addressLine?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    experienceYears?: number;
+    description?: string;
+    profilePhotoKey?: string;
+    workshopPhotos?: string[];
   }) => Promise<void>;
   logout: () => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<void>;
+  refreshProfile: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, password: string) => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -42,7 +65,7 @@ interface AuthState {
   setFixerProfile: (profile: FixerProfile | null) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   fixerProfile: null,
   isAuthenticated: false,
@@ -54,20 +77,36 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (payload?.tokens) {
       await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
       set({ user: payload.user, isAuthenticated: true });
+      await get().refreshProfile();
     }
   },
 
   signup: async (signupData) => {
     const cleanMobile = signupData.phone.replace(/\D/g, '').slice(-10);
     const name = signupData.firstName || signupData.ownerName || 'Fixer';
-    const { data } = await api.post('/auth/signup', {
+    const payloadBody: any = {
       email: signupData.email.trim().toLowerCase(),
       mobile: cleanMobile,
       password: signupData.password,
       firstName: name,
       lastName: signupData.lastName || '',
       role: 'FIXER',
-    });
+      companyName: signupData.companyName || `${name}'s Repairs`,
+    };
+
+    if (signupData.gstin) payloadBody.gstin = signupData.gstin.trim().toUpperCase();
+    if (signupData.panNumber) payloadBody.panNumber = signupData.panNumber.trim().toUpperCase();
+    if (signupData.businessRegNo) payloadBody.businessRegNo = signupData.businessRegNo.trim();
+    if (signupData.addressLine) payloadBody.addressLine = signupData.addressLine.trim();
+    if (signupData.city) payloadBody.city = signupData.city.trim();
+    if (signupData.state) payloadBody.state = signupData.state.trim();
+    if (signupData.pincode) payloadBody.pincode = signupData.pincode.trim();
+    if (signupData.experienceYears) payloadBody.experienceYears = Number(signupData.experienceYears);
+    if (signupData.description) payloadBody.description = signupData.description.trim();
+    if (signupData.profilePhotoKey) payloadBody.profilePhotoKey = signupData.profilePhotoKey;
+    if (signupData.workshopPhotos) payloadBody.workshopPhotos = signupData.workshopPhotos;
+
+    const { data } = await api.post('/auth/signup', payloadBody);
     const payload = data?.data?.data || data?.data || data;
     if (payload?.tokens) {
       await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
@@ -88,7 +127,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (payload?.tokens) {
       await apiClient.setTokens(payload.tokens.accessToken, payload.tokens.refreshToken);
       set({ user: payload.user, isAuthenticated: true });
+      await get().refreshProfile();
     }
+  },
+
+  refreshProfile: async () => {
+    try {
+      const { data } = await api.get('/fixers/me');
+      const profile = data?.data?.profile || data?.data;
+      if (profile) {
+        set({ fixerProfile: profile });
+      }
+    } catch {}
   },
 
   forgotPassword: async (email) => {

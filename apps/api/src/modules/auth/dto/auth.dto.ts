@@ -35,6 +35,11 @@ export class SignupDto {
   @IsString()
   lastName?: string;
 
+  @ApiPropertyOptional({ example: 'Sushanth Chithaluri' })
+  @IsOptional()
+  @IsString()
+  ownerName?: string;
+
   @ApiProperty({
     example: 'SecurePass1!',
     description:
@@ -54,6 +59,64 @@ export class SignupDto {
     message: 'role must be CUSTOMER or FIXER',
   })
   role!: UserRole.CUSTOMER | UserRole.FIXER;
+
+  @ApiPropertyOptional({ example: 'Apex Electronics Repair' })
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @ApiPropertyOptional({ example: '29AAGCB1234N1Z5' })
+  @IsOptional()
+  @IsString()
+  gstin?: string;
+
+  @ApiPropertyOptional({ example: 'ABCDE1234F' })
+  @IsOptional()
+  @IsString()
+  panNumber?: string;
+
+  @ApiPropertyOptional({ example: 'UDYAM-KR-03-0012345' })
+  @IsOptional()
+  @IsString()
+  businessRegNo?: string;
+
+  @ApiPropertyOptional({ example: 'Shop 4, Main Road' })
+  @IsOptional()
+  @IsString()
+  addressLine?: string;
+
+  @ApiPropertyOptional({ example: 'Bengaluru' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({ example: 'Karnataka' })
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional({ example: '560001' })
+  @IsOptional()
+  @IsString()
+  pincode?: string;
+
+  @ApiPropertyOptional({ example: 5 })
+  @IsOptional()
+  experienceYears?: number;
+
+  @ApiPropertyOptional({ example: 'Expert motherboard and display repairs' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  profilePhotoKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  workshopPhotos?: string[];
 }
 
 export class LoginDto {

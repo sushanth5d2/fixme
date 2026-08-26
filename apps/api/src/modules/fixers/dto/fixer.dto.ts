@@ -189,14 +189,22 @@ export class AddFixerServiceAreaDto {
 }
 
 export class VerifyFixerDto {
-  @ApiProperty({ description: 'Approve or reject fixer verification' })
-  @IsEnum(['VERIFIED', 'REJECTED'])
-  action!: 'VERIFIED' | 'REJECTED';
+  @ApiPropertyOptional({ description: 'Approve or reject fixer verification' })
+  @IsOptional()
+  action?: 'VERIFIED' | 'APPROVED' | 'REJECTED';
+
+  @ApiPropertyOptional({ description: 'Status alias' })
+  @IsOptional()
+  status?: string;
 
   @ApiPropertyOptional({ description: 'Required when action is REJECTED' })
   @IsOptional()
   @IsString()
-  @MinLength(10)
   @MaxLength(1000)
   rejectionReason?: string;
+
+  @ApiPropertyOptional({ description: 'Admin notes' })
+  @IsOptional()
+  @IsString()
+  adminNotes?: string;
 }

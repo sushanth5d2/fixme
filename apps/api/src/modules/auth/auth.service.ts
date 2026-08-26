@@ -104,22 +104,43 @@ export class AuthService {
             }));
           }
         } else if (dto.role === UserRole.FIXER) {
+          const owner = dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : (dto.ownerName || 'Fixer');
+          const company = dto.companyName || (dto.firstName ? `${dto.firstName}'s Repairs` : 'Repair Service');
           const fix = await manager.findOne(FixerEntity, { where: { userId: existing.id } });
           if (fix) {
             await manager.update(FixerEntity, fix.id, {
-              ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : fix.ownerName,
-              verificationStatus: FixerVerificationStatus.VERIFIED,
+              ownerName: owner,
+              companyName: company,
+              ...(dto.gstin && { gstin: dto.gstin.toUpperCase() }),
+              ...(dto.panNumber && { panNumber: dto.panNumber.toUpperCase() }),
+              ...(dto.businessRegNo && { businessRegNo: dto.businessRegNo }),
+              ...(dto.addressLine && { addressLine: dto.addressLine }),
+              ...(dto.city && { city: dto.city }),
+              ...(dto.state && { state: dto.state }),
+              ...(dto.pincode && { pincode: dto.pincode }),
+              ...(dto.experienceYears && { experienceYears: Number(dto.experienceYears) }),
+              ...(dto.description && { description: dto.description }),
+              ...(dto.profilePhotoKey && { profilePhotoKey: dto.profilePhotoKey }),
+              ...(dto.workshopPhotos && { workshopPhotos: dto.workshopPhotos }),
+              verificationStatus: FixerVerificationStatus.UNDER_REVIEW,
             });
           } else {
             await manager.save(manager.create(FixerEntity, {
               userId: existing.id,
-              ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : 'Fixer',
-              companyName: dto.firstName ? `${dto.firstName}'s Repairs` : 'Repair Service',
-              addressLine: 'Shop 1, Main Road',
-              city: 'Bengaluru',
-              state: 'Karnataka',
-              pincode: '560001',
-              verificationStatus: FixerVerificationStatus.VERIFIED,
+              ownerName: owner,
+              companyName: company,
+              gstin: dto.gstin ? dto.gstin.toUpperCase() : null,
+              panNumber: dto.panNumber ? dto.panNumber.toUpperCase() : null,
+              businessRegNo: dto.businessRegNo || null,
+              addressLine: dto.addressLine || 'Shop 1, Main Road',
+              city: dto.city || 'Bengaluru',
+              state: dto.state || 'Karnataka',
+              pincode: dto.pincode || '560001',
+              experienceYears: dto.experienceYears ? Number(dto.experienceYears) : 1,
+              description: dto.description || null,
+              profilePhotoKey: dto.profilePhotoKey || null,
+              workshopPhotos: dto.workshopPhotos || [],
+              verificationStatus: FixerVerificationStatus.UNDER_REVIEW,
             }));
           }
         }
@@ -155,15 +176,24 @@ export class AuthService {
         });
         await manager.save(customer);
       } else if (dto.role === UserRole.FIXER) {
+        const owner = dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : (dto.ownerName || 'Fixer');
+        const company = dto.companyName || (dto.firstName ? `${dto.firstName}'s Repairs` : 'Repair Service');
         const fixer = manager.create(FixerEntity, {
           userId: user.id,
-          ownerName: dto.firstName ? `${dto.firstName} ${dto.lastName || ''}`.trim() : 'Fixer',
-          companyName: dto.firstName ? `${dto.firstName}'s Repairs` : 'Repair Service',
-          addressLine: 'Shop 1, Main Road',
-          city: 'Bengaluru',
-          state: 'Karnataka',
-          pincode: '560001',
-          verificationStatus: isDev ? FixerVerificationStatus.VERIFIED : FixerVerificationStatus.REGISTERED,
+          ownerName: owner,
+          companyName: company,
+          gstin: dto.gstin ? dto.gstin.toUpperCase() : null,
+          panNumber: dto.panNumber ? dto.panNumber.toUpperCase() : null,
+          businessRegNo: dto.businessRegNo || null,
+          addressLine: dto.addressLine || 'Shop 1, Main Road',
+          city: dto.city || 'Bengaluru',
+          state: dto.state || 'Karnataka',
+          pincode: dto.pincode || '560001',
+          experienceYears: dto.experienceYears ? Number(dto.experienceYears) : 1,
+          description: dto.description || null,
+          profilePhotoKey: dto.profilePhotoKey || null,
+          workshopPhotos: dto.workshopPhotos || [],
+          verificationStatus: FixerVerificationStatus.UNDER_REVIEW,
         });
         await manager.save(fixer);
       }

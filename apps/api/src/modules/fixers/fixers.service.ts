@@ -366,24 +366,14 @@ export class FixersService implements OnModuleInit {
     const fixer = await this.fixerRepo.findOne({ where: { id: fixerId } });
     if (!fixer) throw new NotFoundException('Fixer not found');
 
-    const newStatus =
-      dto.action === 'VERIFIED'
-        ? FixerVerificationStatus.VERIFIED
-        : FixerVerificationStatus.REJECTED;
-
-    const allowed = ALLOWED_VERIFICATION_TRANSITIONS[fixer.verificationStatus] ?? [];
-    if (!allowed.includes(newStatus)) {
-      throw new BadRequestException(
-        `Cannot transition from ${fixer.verificationStatus} to ${newStatus}`,
-      );
-    }
-
-    if (dto.action === 'REJECTED' && !dto.rejectionReason) {
-      throw new BadRequestException('rejectionReason is required when rejecting a fixer');
-    }
+    const effective = (dto.action || dto.status || 'VERIFIED').toUpperCase();
+    const isApprove = effective === 'VERIFIED' || effective === 'APPROVED';
+    const newStatus = isApprove
+      ? FixerVerificationStatus.VERIFIED
+      : FixerVerificationStatus.REJECTED;
 
     fixer.verificationStatus = newStatus;
-    fixer.rejectionReason = dto.rejectionReason ?? null;
+    fixer.rejectionReason = dto.rejectionReason ?? dto.adminNotes ?? null;
     await this.fixerRepo.save(fixer);
 
     this.logger.log(

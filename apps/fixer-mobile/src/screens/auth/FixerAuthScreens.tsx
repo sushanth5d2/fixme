@@ -106,12 +106,56 @@ export function FixerLoginScreen({ navigation }: any) {
   );
 }
 
+import * as Location from 'expo-location';
+
 export function FixerSignupScreen({ navigation }: any) {
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '' });
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: '',
+    companyName: '',
+    gstin: '',
+    panNumber: '',
+    businessRegNo: '',
+    experienceYears: '1',
+    description: '',
+    addressLine: '',
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    pincode: '',
+  });
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
   const signup = useAuthStore((s) => s.signup);
 
   const update = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleDetectLocation = async () => {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Needed', 'Please allow location permission to auto-detect your workshop address.');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      if (geo) {
+        const line = [geo.name, geo.streetNumber, geo.street].filter(Boolean).join(', ');
+        if (line) update('addressLine', line);
+        if (geo.city || geo.subregion) update('city', geo.city || geo.subregion || 'Bengaluru');
+        if (geo.region) update('state', geo.region || 'Karnataka');
+        if (geo.postalCode) update('pincode', geo.postalCode.replace(/\D/g, '').slice(0, 6));
+      }
+      Alert.alert('Location Detected 📍', 'Workshop address fields populated.');
+    } catch {
+      Alert.alert('Location Error', 'Could not auto-detect location. Please enter manually.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const handleSignup = async () => {
     if (!form.firstName.trim() || !form.email.includes('@') || form.password.length < 8) {
@@ -122,10 +166,23 @@ export function FixerSignupScreen({ navigation }: any) {
       Alert.alert('Required', 'Please enter a valid 10-digit mobile number.');
       return;
     }
+    if (!form.companyName.trim()) {
+      Alert.alert('Required', 'Please enter your Workshop / Business Name.');
+      return;
+    }
+    if (!form.addressLine.trim() || form.pincode.replace(/\D/g, '').length !== 6) {
+      Alert.alert('Required', 'Please enter your workshop address and valid 6-digit pincode.');
+      return;
+    }
 
     setLoading(true);
     try {
-      await signup({ ...form, phone: form.phone.replace(/\D/g, '').slice(-10) });
+      await signup({
+        ...form,
+        phone: form.phone.replace(/\D/g, '').slice(-10),
+        pincode: form.pincode.replace(/\D/g, '').slice(0, 6),
+        experienceYears: parseInt(form.experienceYears, 10) || 1,
+      });
       navigation.navigate('OtpVerify', { phone: form.phone.replace(/\D/g, '').slice(-10) });
     } catch (err: any) {
       console.error('[Fixer Signup Error]', err?.response?.data || err);
@@ -139,19 +196,52 @@ export function FixerSignupScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Register as Fixer</Text>
-        <Text style={styles.subtitle}>Create your professional technician account to start receiving repair leads</Text>
-
-        <View style={styles.row}>
-          <Input label="First Name" value={form.firstName} onChangeText={(v) => update('firstName', v)} containerStyle={styles.half} placeholder="Ravi" />
-          <Input label="Last Name" value={form.lastName} onChangeText={(v) => update('lastName', v)} containerStyle={styles.half} placeholder="Kumar" />
+        <View style={styles.header}>
+          <Text style={styles.logo}>🏢</Text>
+          <Text style={styles.title}>Register Workshop & KYC</Text>
+          <Text style={styles.subtitle}>Create your business account and submit your profile for admin verification</Text>
         </View>
-        <Input label="Email" value={form.email} onChangeText={(v) => update('email', v)} keyboardType="email-address" autoCapitalize="none" placeholder="you@company.com" />
-        <Input label="Mobile" value={form.phone} onChangeText={(v) => update('phone', v.replace(/\D/g, '').slice(0, 10))} keyboardType="phone-pad" maxLength={10} placeholder="9876543210" />
-        <PasswordInput label="Password" value={form.password} onChangeText={(v) => update('password', v)} placeholder="Min. 8 characters" />
 
-        <Button title="Create Account & Continue" onPress={handleSignup} loading={loading} size="lg" />
-        <Button title="Already have an account? Sign In" onPress={() => navigation.goBack()} variant="ghost" size="sm" />
+        {/* Section 1: Owner Credentials */}
+        <View style={styles.sectionBox}>
+          <Text style={styles.sectionTitle}>👤 Owner & Login Credentials</Text>
+          <View style={styles.row}>
+            <Input label="Owner First Name *" value={form.firstName} onChangeText={(v) => update('firstName', v)} containerStyle={styles.half} placeholder="Ravi" />
+            <Input label="Owner Last Name" value={form.lastName} onChangeText={(v) => update('lastName', v)} containerStyle={styles.half} placeholder="Kumar" />
+          </View>
+          <Input label="Login Email *" value={form.email} onChangeText={(v) => update('email', v)} keyboardType="email-address" autoCapitalize="none" placeholder="owner@company.com" />
+          <Input label="Mobile Number *" value={form.phone} onChangeText={(v) => update('phone', v.replace(/\D/g, '').slice(0, 10))} keyboardType="phone-pad" maxLength={10} placeholder="9876543210" />
+          <PasswordInput label="Account Password *" value={form.password} onChangeText={(v) => update('password', v)} placeholder="Min. 8 characters" />
+        </View>
+
+        {/* Section 2: Business & KYC Identifiers */}
+        <View style={styles.sectionBox}>
+          <Text style={styles.sectionTitle}>🏢 Business Identity & Tax KYC</Text>
+          <Input label="Workshop / Business Name *" value={form.companyName} onChangeText={(v) => update('companyName', v)} placeholder="e.g. Apex Electronics & Mobile Care" />
+          <Input label="Years of Experience" value={form.experienceYears} onChangeText={(v) => update('experienceYears', v.replace(/\D/g, ''))} keyboardType="number-pad" placeholder="e.g. 5" />
+          <Input label="GSTIN (optional)" value={form.gstin} onChangeText={(v) => update('gstin', v.toUpperCase())} placeholder="22AAAAA0000A1Z5" autoCapitalize="characters" maxLength={15} />
+          <Input label="PAN Number (optional)" value={form.panNumber} onChangeText={(v) => update('panNumber', v.toUpperCase())} placeholder="ABCDE1234F" autoCapitalize="characters" maxLength={10} />
+          <Input label="Trade License / MSME No. (optional)" value={form.businessRegNo} onChangeText={(v) => update('businessRegNo', v)} placeholder="e.g. UDYAM-KR-03-0012345" />
+        </View>
+
+        {/* Section 3: Workshop Location */}
+        <View style={styles.sectionBox}>
+          <View style={styles.locationHeaderRow}>
+            <Text style={styles.sectionTitle}>📍 Workshop Address</Text>
+            <TouchableOpacity style={styles.detectBtn} onPress={handleDetectLocation} disabled={locating}>
+              <Text style={styles.detectBtnText}>{locating ? 'Locating...' : '📍 Auto-Detect'}</Text>
+            </TouchableOpacity>
+          </View>
+          <Input label="Shop / Building & Street Name *" value={form.addressLine} onChangeText={(v) => update('addressLine', v)} placeholder="Shop 4, Ground Floor, Main Road" />
+          <View style={styles.row}>
+            <Input label="City *" value={form.city} onChangeText={(v) => update('city', v)} containerStyle={styles.half} placeholder="Bengaluru" />
+            <Input label="State *" value={form.state} onChangeText={(v) => update('state', v)} containerStyle={styles.half} placeholder="Karnataka" />
+          </View>
+          <Input label="Pincode (6 digits) *" value={form.pincode} onChangeText={(v) => update('pincode', v.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" maxLength={6} placeholder="560001" />
+        </View>
+
+        <Button title="Submit Application & Continue" onPress={handleSignup} loading={loading} size="lg" />
+        <Button title="Already registered? Sign In" onPress={() => navigation.goBack()} variant="ghost" size="sm" />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -207,7 +297,7 @@ export function FixerOtpVerifyScreen({ route, navigation }: any) {
           <Text style={styles.devBypassText}>⚡ Testing? Tap here to autofill test OTP (123456)</Text>
         </TouchableOpacity>
 
-        <Button title="Verify & Get Started" onPress={handleVerify} loading={loading} size="lg" />
+        <Button title="Verify & Submit to Admin" onPress={handleVerify} loading={loading} size="lg" />
         <Button title="Change Mobile Number" onPress={() => navigation.goBack()} variant="ghost" size="sm" />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -280,5 +370,39 @@ const styles = StyleSheet.create({
     color: Colors.muted,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  sectionBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    gap: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+  },
+  locationHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  detectBtn: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  detectBtnText: {
+    fontSize: FontSize.xs,
+    color: '#16A34A',
+    fontWeight: FontWeight.semibold,
   },
 });
