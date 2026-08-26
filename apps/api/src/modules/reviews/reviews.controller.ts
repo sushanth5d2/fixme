@@ -54,7 +54,19 @@ export class ReviewsController {
     return this.reviewsService.getFixerReviews(fixerId, Number(page), Math.min(Number(limit), 100));
   }
 
-  @Patch(':reviewId/hide')
+  @Get('admin')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: '[Admin] List all reviews for moderation' })
+  @ApiQuery({ name: 'page', required: false, type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number' })
+  public listForAdmin(
+    @Query('page') page = 1,
+    @Query('limit') limit = 50,
+  ) {
+    return this.reviewsService.listForAdmin(Number(page), Math.min(Number(limit), 100));
+  }
+
+  @Patch([':reviewId/hide', 'admin/:reviewId/hide'])
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: '[Admin] Hide a review' })
   @ApiParam({ name: 'reviewId', type: 'string', format: 'uuid' })
@@ -62,7 +74,7 @@ export class ReviewsController {
     return this.reviewsService.hide(reviewId);
   }
 
-  @Patch(':reviewId/restore')
+  @Patch([':reviewId/restore', 'admin/:reviewId/restore'])
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: '[Admin] Restore a hidden review' })
   @ApiParam({ name: 'reviewId', type: 'string', format: 'uuid' })

@@ -121,6 +121,36 @@ export class ReviewsService {
     return { data, total, averageRating: Number(fixer.averageRating) };
   }
 
+  // Admin: list all reviews
+  public async listForAdmin(
+    page = 1,
+    limit = 50,
+  ): Promise<{ data: any[]; total: number }> {
+    const [reviews, total] = await this.reviewRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.customer', 'customer')
+      .leftJoinAndSelect('customer.user', 'user')
+      .leftJoinAndSelect('r.fixer', 'fixer')
+      .leftJoinAndSelect('r.job', 'job')
+      .orderBy('r.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const mapped = reviews.map((r) => ({
+      id: r.id,
+      rating: r.overallRating,
+      comment: r.reviewText,
+      isHidden: r.status === ReviewStatus.HIDDEN,
+      customer: { email: r.customer?.user?.email || (r.customer as any)?.email || 'Customer' },
+      fixer: { companyName: r.fixer?.companyName || 'Fixer' },
+      job: { id: r.jobId },
+      createdAt: r.createdAt,
+    }));
+
+    return { data: mapped, total };
+  }
+
   // Admin: hide/restore reviews
   public async hide(reviewId: string): Promise<{ message: string }> {
     const review = await this.reviewRepo.findOne({ where: { id: reviewId } });

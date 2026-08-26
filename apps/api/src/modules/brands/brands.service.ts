@@ -28,10 +28,18 @@ export class BrandsService {
     return brand;
   }
 
-  public async create(dto: CreateBrandDto): Promise<DeviceBrandEntity> {
-    const existing = await this.brandRepo.findOne({ where: { slug: dto.slug } });
-    if (existing) throw new ConflictException('Brand slug already exists');
-    const brand = this.brandRepo.create({ ...dto, isActive: true });
+  public async create(dto: Partial<CreateBrandDto> & { name: string }): Promise<DeviceBrandEntity> {
+    const slug = dto.slug || dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const existing = await this.brandRepo.findOne({ where: { slug } });
+    if (existing) {
+      if (!existing.isActive) {
+        existing.isActive = true;
+        existing.name = dto.name;
+        return this.brandRepo.save(existing);
+      }
+      throw new ConflictException('Brand with this name/slug already exists');
+    }
+    const brand = this.brandRepo.create({ ...dto, slug, isActive: true });
     return this.brandRepo.save(brand);
   }
 

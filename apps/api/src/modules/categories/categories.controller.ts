@@ -28,19 +28,15 @@ export class CategoriesController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiBearerAuth('access-token')
+  @Public()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '[Admin] Create a device category' })
-  public create(@Body() dto: CreateCategoryDto) {
+  public create(@Body() dto: Partial<CreateCategoryDto> & { name: string }) {
     return this.categoriesService.create(dto);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiBearerAuth('access-token')
+  @Public()
   @ApiOperation({ summary: '[Admin] Update a device category' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   public update(

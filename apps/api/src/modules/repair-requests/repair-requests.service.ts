@@ -425,14 +425,32 @@ export class RepairRequestsService implements OnModuleInit {
   public async getAllForAdmin(
     status?: RequestStatus,
     page = 1,
-    limit = 20,
-  ): Promise<{ data: RepairRequestEntity[]; total: number }> {
+    limit = 50,
+  ): Promise<{ data: any[]; total: number }> {
     const query = this.requestRepo.createQueryBuilder('req');
     if (status) query.where('req.status = :status', { status });
     query.leftJoinAndSelect('req.category', 'cat');
     query.leftJoinAndSelect('req.brand', 'brand');
+    query.leftJoinAndSelect('req.customer', 'cust');
+    query.leftJoinAndSelect('cust.user', 'user');
     query.orderBy('req.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
     const [data, total] = await query.getManyAndCount();
-    return { data, total };
+
+    const mapped = data.map((r) => ({
+      id: r.id,
+      description: r.problemDescription || r.problemTitle || 'Repair Request',
+      status: r.status,
+      priority: r.urgency || 'STANDARD',
+      deviceModel: r.deviceModel,
+      category: r.category ? { name: r.category.name } : { name: 'Device' },
+      brand: r.brand ? { name: r.brand.name } : null,
+      customer: {
+        email: r.customer?.user?.email || (r.customer as any)?.email || 'Customer',
+        name: r.customer?.firstName ? `${r.customer.firstName} ${r.customer.lastName || ''}`.trim() : 'Customer',
+      },
+      createdAt: r.createdAt,
+    }));
+
+    return { data: mapped, total };
   }
 }

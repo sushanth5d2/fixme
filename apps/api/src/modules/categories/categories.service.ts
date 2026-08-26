@@ -98,10 +98,18 @@ export class CategoriesService implements OnModuleInit {
     return cat;
   }
 
-  public async create(dto: CreateCategoryDto): Promise<DeviceCategoryEntity> {
-    const existing = await this.categoryRepo.findOne({ where: { slug: dto.slug } });
-    if (existing) throw new ConflictException('Category slug already exists');
-    const cat = this.categoryRepo.create({ ...dto, isActive: true });
+  public async create(dto: Partial<CreateCategoryDto> & { name: string }): Promise<DeviceCategoryEntity> {
+    const slug = dto.slug || dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const existing = await this.categoryRepo.findOne({ where: { slug } });
+    if (existing) {
+      if (!existing.isActive) {
+        existing.isActive = true;
+        existing.name = dto.name;
+        return this.categoryRepo.save(existing);
+      }
+      throw new ConflictException('Category with this name/slug already exists');
+    }
+    const cat = this.categoryRepo.create({ ...dto, slug, isActive: true });
     return this.categoryRepo.save(cat);
   }
 

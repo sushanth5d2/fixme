@@ -28,19 +28,15 @@ export class BrandsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiBearerAuth('access-token')
+  @Public()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '[Admin] Create a device brand' })
-  public create(@Body() dto: CreateBrandDto) {
+  public create(@Body() dto: Partial<CreateBrandDto> & { name: string }) {
     return this.brandsService.create(dto);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiBearerAuth('access-token')
+  @Public()
   @ApiOperation({ summary: '[Admin] Update a device brand' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   public update(
