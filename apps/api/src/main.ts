@@ -4,7 +4,6 @@ import { ValidationPipe, VersioningType, RequestMethod } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import { WinstonModule } from 'nest-winston';
@@ -21,8 +20,8 @@ async function bootstrap(): Promise<void> {
   });
 
   // ── Body Parser Limits (50mb for image uploads) ─────────────
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ limit: '50mb', extended: true }));
+  app.useBodyParser('json', { limit: '50mb' });
+  app.useBodyParser('urlencoded', { limit: '50mb', extended: true });
 
   const configService = app.get(ConfigService);
 
