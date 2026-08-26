@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, ParseUUIDPipe, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, ParseUUIDPipe, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CategoriesService, CreateCategoryDto } from './categories.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -44,5 +44,13 @@ export class CategoriesController {
     @Body() dto: Partial<CreateCategoryDto>,
   ) {
     return this.categoriesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Public()
+  @ApiOperation({ summary: '[Admin] Delete a device category' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  public delete(@Param('id', ParseUUIDPipe) id: string) {
+    return this.categoriesService.delete(id);
   }
 }

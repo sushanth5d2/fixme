@@ -6,6 +6,7 @@ import { DeviceCategoryEntity } from './device-category.entity';
 export class CreateCategoryDto {
   name!: string;
   slug!: string;
+  iconKey?: string;
   sortOrder?: number;
 }
 
@@ -35,6 +36,10 @@ export class CategoriesService implements OnModuleInit {
 
   public async onModuleInit(): Promise<void> {
     try {
+      await this.categoryRepo.query(
+        'ALTER TABLE device_categories ALTER COLUMN icon_key TYPE TEXT;',
+      ).catch(() => {});
+
       this.logger.log('Syncing and deduplicating service categories...');
       // Deactivate redundant duplicate slugs
       await this.categoryRepo
@@ -65,7 +70,6 @@ export class CategoriesService implements OnModuleInit {
 
   public async findAll(): Promise<DeviceCategoryEntity[]> {
     const list = await this.categoryRepo.find({
-      where: { isActive: true },
       order: { sortOrder: 'ASC', name: 'ASC' },
     });
 
@@ -102,21 +106,25 @@ export class CategoriesService implements OnModuleInit {
     const slug = dto.slug || dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const existing = await this.categoryRepo.findOne({ where: { slug } });
     if (existing) {
-      if (!existing.isActive) {
-        existing.isActive = true;
-        existing.name = dto.name;
-        return this.categoryRepo.save(existing);
-      }
-      throw new ConflictException('Category with this name/slug already exists');
+      existing.isActive = true;
+      existing.name = dto.name;
+      if (dto.iconKey) existing.iconKey = dto.iconKey;
+      return this.categoryRepo.save(existing);
     }
     const cat = this.categoryRepo.create({ ...dto, slug, isActive: true });
     return this.categoryRepo.save(cat);
   }
 
-  public async update(id: string, dto: Partial<CreateCategoryDto>): Promise<DeviceCategoryEntity> {
+  public async update(id: string, dto: Partial<CreateCategoryDto> & { isActive?: boolean }): Promise<DeviceCategoryEntity> {
     const cat = await this.findById(id);
     Object.assign(cat, dto);
     return this.categoryRepo.save(cat);
+  }
+
+  public async delete(id: string): Promise<{ message: string }> {
+    const cat = await this.findById(id);
+    await this.categoryRepo.delete(id);
+    return { message: 'Category deleted successfully' };
   }
 
   public async deactivate(id: string): Promise<{ message: string }> {

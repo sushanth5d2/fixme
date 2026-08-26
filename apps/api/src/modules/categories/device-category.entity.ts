@@ -19,7 +19,7 @@ export class DeviceCategoryEntity {
   @Column({ type: 'varchar', length: 100 })
   slug!: string;
 
-  @Column({ name: 'icon_key', type: 'varchar', length: 512, nullable: true })
+  @Column({ name: 'icon_key', type: 'text', nullable: true })
   iconKey!: string | null;
 
   @Index()
